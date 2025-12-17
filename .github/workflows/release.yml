@@ -1,0 +1,132 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Release Binaries
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: bun install
+
+      - name: Build backend binaries
+        working-directory: backend
+        run: make package-all
+
+      - name: Build MCP server binaries
+        working-directory: mcp-server
+        run: make build-all
+
+      - name: Prepare release artifacts
+        run: |
+          mkdir -p release
+
+          # CLI binaries with embedded frontend
+          cp backend/bin/knot-linux release/knot-linux
+          cp backend/bin/knot-macos-amd64 release/knot-macos-amd64
+          cp backend/bin/knot-macos-arm64 release/knot-macos-arm64
+          cp backend/bin/knot-windows.exe release/knot-windows.exe
+
+          # Server binaries (API only)
+          cp backend/bin/knot-server-linux release/knot-server-linux
+          cp backend/bin/knot-server-macos-amd64 release/knot-server-macos-amd64
+          cp backend/bin/knot-server-macos-arm64 release/knot-server-macos-arm64
+          cp backend/bin/knot-server-windows.exe release/knot-server-windows.exe
+
+          # MCP server binaries
+          cp mcp-server/bin/knot-mcp-linux release/knot-mcp-linux
+          cp mcp-server/bin/knot-mcp-macos release/knot-mcp-macos-amd64
+          cp mcp-server/bin/knot-mcp-macos-arm64 release/knot-mcp-macos-arm64
+          cp mcp-server/bin/knot-mcp-windows.exe release/knot-mcp-windows.exe
+
+          # Create checksums
+          cd release
+          sha256sum * > checksums.txt
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            release/knot-linux
+            release/knot-macos-amd64
+            release/knot-macos-arm64
+            release/knot-windows.exe
+            release/knot-server-linux
+            release/knot-server-macos-amd64
+            release/knot-server-macos-arm64
+            release/knot-server-windows.exe
+            release/knot-mcp-linux
+            release/knot-mcp-macos-amd64
+            release/knot-mcp-macos-arm64
+            release/knot-mcp-windows.exe
+            release/checksums.txt
+          body: |
+            ## Knot Release ${{ github.ref_name }}
+
+            ### 📦 下载 / Download
+
+            #### CLI 版本（包含前端界面）/ CLI Version (with embedded frontend)
+            - **macOS (Apple Silicon)**: `knot-macos-arm64`
+            - **macOS (Intel)**: `knot-macos-amd64`
+            - **Linux (AMD64)**: `knot-linux`
+            - **Windows (AMD64)**: `knot-windows.exe`
+
+            #### Server 版本（仅后端API）/ Server Version (API only)
+            - **macOS (Apple Silicon)**: `knot-server-macos-arm64`
+            - **macOS (Intel)**: `knot-server-macos-amd64`
+            - **Linux (AMD64)**: `knot-server-linux`
+            - **Windows (AMD64)**: `knot-server-windows.exe`
+
+            #### MCP Server 版本（AI 集成）/ MCP Server Version (AI Integration)
+            - **macOS (Apple Silicon)**: `knot-mcp-macos-arm64`
+            - **macOS (Intel)**: `knot-mcp-macos-amd64`
+            - **Linux (AMD64)**: `knot-mcp-linux`
+            - **Windows (AMD64)**: `knot-mcp-windows.exe`
+
+            ### 📋 安装说明 / Installation
+
+            ```bash
+            # macOS/Linux - 下载后添加执行权限
+            chmod +x knot-*
+
+            # 移动到系统路径（可选）
+            sudo mv knot-macos-arm64 /usr/local/bin/knot
+
+            # MCP Server - 配置 Claude Desktop
+            # 1. 下载对应平台的 knot-mcp 二进制
+            # 2. 添加执行权限: chmod +x knot-mcp-*
+            # 3. 在 Claude Desktop 配置中添加（参考 mcp-server/README.md）
+            ```
+
+            ### ✅ 校验和 / Checksums
+            请查看 `checksums.txt` 文件验证下载的完整性。
+
+            ---
+
+            **完整文档**: https://github.com/ProjAnvil/knot
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
