@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "knot": {
+      "command": "/path/to/knot-mcp",
+      "env": {
+        "KNOT_BASE_URL": "http://localhost:3000"
+      }
+    }
+  }
+}

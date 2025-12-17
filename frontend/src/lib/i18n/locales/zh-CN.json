@@ -1,0 +1,132 @@
+{
+	"common": {
+		"cancel": "取消",
+		"save": "保存",
+		"edit": "编辑",
+		"delete": "删除",
+		"deleting": "删除中...",
+		"add": "添加",
+		"create": "创建",
+		"update": "更新",
+		"search": "搜索",
+		"loading": "加载中...",
+		"saving": "保存中...",
+		"required": "必填",
+		"optional": "选填",
+		"name": "名称",
+		"type": "类型",
+		"description": "说明"
+	},
+	"sidebar": {
+		"title": "API 文档",
+		"createGroup": "新建分组",
+		"noGroups": "暂无分组",
+		"noApis": "暂无 API"
+	},
+	"group": {
+		"create": "创建分组",
+		"name": "分组名称",
+		"placeholder": "请输入分组名称",
+		"createSuccess": "分组创建成功",
+		"createError": "创建分组失败",
+		"renameGroup": "重命名分组",
+		"renameDescription": "为此分组输入新名称",
+		"renameSuccess": "分组重命名成功",
+		"renameError": "重命名分组失败",
+		"deleteTitle": "删除分组",
+		"deleteDescription": "确定要删除分组 '{name}' 及其中的 {count} 个 API 吗？",
+		"deleteWarning": "此操作无法撤销。",
+		"deleteSuccess": "分组删除成功",
+		"deleteError": "删除分组失败"
+	},
+	"api": {
+		"create": "创建 API",
+		"edit": "编辑 API",
+		"name": "API 名称",
+		"nameRequired": "API 名称为必填项",
+		"endpoint": "接口地址",
+		"endpointRequired": "接口地址为必填项",
+		"method": "请求方法",
+		"type": "类型",
+		"group": "分组",
+		"selectGroup": "选择分组",
+		"createSuccess": "API 创建成功",
+		"updateSuccess": "API 更新成功",
+		"createError": "创建 API 失败",
+		"updateError": "更新 API 失败",
+		"deleteTitle": "删除 API",
+		"deleteDescription": "确定要删除 API '{name}' 吗？",
+		"deleteWarning": "此操作将删除所有参数，且无法撤销。",
+		"deleteSuccess": "API 删除成功",
+		"deleteError": "删除 API 失败",
+		"note": "备注",
+		"noNote": "暂无备注。点击编辑添加备注。",
+		"notePlaceholder": "在此添加备注... 支持 Markdown 语法。",
+		"noteSaved": "备注保存成功",
+		"noteSaveFailed": "备注保存失败",
+		"preview": "预览"
+	},
+	"docViewer": {
+		"share": "分享",
+		"shareLink": "分享链接",
+		"copied": "已复制！",
+		"linkCopied": "链接已复制到剪贴板！",
+		"copyFailed": "复制链接失败"
+	},
+	"parameters": {
+		"request": "请求参数",
+		"response": "响应参数",
+		"noParameters": "暂无参数定义。",
+		"addParameters": "添加参数",
+		"addParameter": "添加参数",
+		"updateSuccess": "参数更新成功",
+		"updateError": "参数更新失败",
+		"name": "名称",
+		"type": "类型",
+		"required": "必填",
+		"description": "说明",
+		"actions": "操作",
+		"decreaseIndent": "减少缩进",
+		"increaseIndent": "增加缩进",
+		"addAfter": "在后面添加参数",
+		"deleteParameter": "删除参数"
+	},
+	"json": {
+		"requestExample": "请求 JSON 示例",
+		"responseExample": "响应 JSON 示例",
+		"invalid": "无效的 JSON 格式",
+		"updateSuccess": "JSON 更新成功",
+		"updateError": "更新 JSON 失败"
+	},
+	"types": {
+		"string": "字符串",
+		"number": "数字",
+		"boolean": "布尔值",
+		"array": "数组",
+		"object": "对象"
+	},
+	"methods": {
+		"GET": "GET",
+		"POST": "POST",
+		"PUT": "PUT",
+		"DELETE": "DELETE",
+		"PATCH": "PATCH"
+	},
+	"apiTypes": {
+		"REST": "REST",
+		"RPC": "RPC",
+		"GraphQL": "GraphQL"
+	},
+	"export": {
+		"title": "导出",
+		"selectItems": "选择要导出的 API",
+		"selectAll": "全选",
+		"clearAll": "清空",
+		"apis": "个 API",
+		"noSelection": "请至少选择一个 API",
+		"exporting": "导出中...",
+		"exportHtml": "导出 HTML",
+		"success": "导出成功",
+		"error": "导出失败"
+	}
+}

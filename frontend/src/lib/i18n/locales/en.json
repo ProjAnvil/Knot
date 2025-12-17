@@ -1,0 +1,132 @@
+{
+	"common": {
+		"cancel": "Cancel",
+		"save": "Save",
+		"edit": "Edit",
+		"delete": "Delete",
+		"deleting": "Deleting...",
+		"add": "Add",
+		"create": "Create",
+		"update": "Update",
+		"search": "Search",
+		"loading": "Loading...",
+		"saving": "Saving...",
+		"required": "Required",
+		"optional": "Optional",
+		"name": "Name",
+		"type": "Type",
+		"description": "Description"
+	},
+	"sidebar": {
+		"title": "API Documentation",
+		"createGroup": "New Group",
+		"noGroups": "No groups yet",
+		"noApis": "No APIs yet"
+	},
+	"group": {
+		"create": "Create Group",
+		"name": "Group Name",
+		"placeholder": "Enter group name",
+		"createSuccess": "Group created successfully",
+		"createError": "Failed to create group",
+		"renameGroup": "Rename Group",
+		"renameDescription": "Enter a new name for this group",
+		"renameSuccess": "Group renamed successfully",
+		"renameError": "Failed to rename group",
+		"deleteTitle": "Delete Group",
+		"deleteDescription": "Are you sure you want to delete the group '{name}' and all {count} APIs in it?",
+		"deleteWarning": "This action cannot be undone.",
+		"deleteSuccess": "Group deleted successfully",
+		"deleteError": "Failed to delete group"
+	},
+	"api": {
+		"create": "Create API",
+		"edit": "Edit API",
+		"name": "API Name",
+		"nameRequired": "API name is required",
+		"endpoint": "Endpoint",
+		"endpointRequired": "Endpoint is required",
+		"method": "Method",
+		"type": "Type",
+		"group": "Group",
+		"selectGroup": "Select a group",
+		"createSuccess": "API created successfully",
+		"updateSuccess": "API updated successfully",
+		"createError": "Failed to create API",
+		"updateError": "Failed to update API",
+		"deleteTitle": "Delete API",
+		"deleteDescription": "Are you sure you want to delete the API '{name}'?",
+		"deleteWarning": "This action will delete all parameters. This cannot be undone.",
+		"deleteSuccess": "API deleted successfully",
+		"deleteError": "Failed to delete API",
+		"note": "Note",
+		"noNote": "No note added yet. Click edit to add notes.",
+		"notePlaceholder": "Add notes here... Supports Markdown syntax.",
+		"noteSaved": "Note saved successfully",
+		"noteSaveFailed": "Failed to save note",
+		"preview": "Preview"
+	},
+	"docViewer": {
+		"share": "Share",
+		"shareLink": "Share link",
+		"copied": "Copied!",
+		"linkCopied": "Link copied to clipboard!",
+		"copyFailed": "Failed to copy link"
+	},
+	"parameters": {
+		"request": "Request Parameters",
+		"response": "Response Parameters",
+		"noParameters": "No parameters defined.",
+		"addParameters": "Add Parameters",
+		"addParameter": "Add Parameter",
+		"updateSuccess": "Parameters updated successfully",
+		"updateError": "Failed to update parameters",
+		"name": "Name",
+		"type": "Type",
+		"required": "Required",
+		"description": "Description",
+		"actions": "Actions",
+		"decreaseIndent": "Decrease indent",
+		"increaseIndent": "Increase indent",
+		"addAfter": "Add parameter after",
+		"deleteParameter": "Delete parameter"
+	},
+	"json": {
+		"requestExample": "Request JSON Example",
+		"responseExample": "Response JSON Example",
+		"invalid": "Invalid JSON format",
+		"updateSuccess": "JSON updated successfully",
+		"updateError": "Failed to update JSON"
+	},
+	"types": {
+		"string": "String",
+		"number": "Number",
+		"boolean": "Boolean",
+		"array": "Array",
+		"object": "Object"
+	},
+	"methods": {
+		"GET": "GET",
+		"POST": "POST",
+		"PUT": "PUT",
+		"DELETE": "DELETE",
+		"PATCH": "PATCH"
+	},
+	"apiTypes": {
+		"REST": "REST",
+		"RPC": "RPC",
+		"GraphQL": "GraphQL"
+	},
+	"export": {
+		"title": "Export",
+		"selectItems": "Select APIs to Export",
+		"selectAll": "Select All",
+		"clearAll": "Clear All",
+		"apis": "APIs",
+		"noSelection": "Please select at least one API",
+		"exporting": "Exporting...",
+		"exportHtml": "Export HTML",
+		"success": "Export successful",
+		"error": "Export failed"
+	}
+}
