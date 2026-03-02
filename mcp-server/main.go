@@ -9,10 +9,16 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
+
+// HTTP client with timeout
+var httpClient = &http.Client{
+	Timeout: 10 * time.Second,
+}
 
 /**
  * Knot MCP Server - Read-only API documentation query interface
@@ -62,7 +68,7 @@ func callAPI(tool string, args map[string]interface{}) (interface{}, error) {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	resp, err := http.Post(API_ENDPOINT, "application/json", bytes.NewBuffer(jsonData))
+	resp, err := httpClient.Post(API_ENDPOINT, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("API call failed: %w", err)
 	}
@@ -93,6 +99,24 @@ func callAPI(tool string, args map[string]interface{}) (interface{}, error) {
 	return result.Data, nil
 }
 
+// handleToolCall is a generic handler for MCP tool calls
+func handleToolCall(toolName string) func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args, _ := request.Params.Arguments.(map[string]interface{})
+		data, err := callAPI(toolName, args)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		jsonData, err := json.MarshalIndent(data, "", "  ")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to format result: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(string(jsonData)), nil
+	}
+}
+
 func main() {
 	// Create MCP server
 	mcpServer := server.NewMCPServer(
@@ -112,20 +136,7 @@ func main() {
 			Properties: map[string]interface{}{},
 			Required:   []string{},
 		},
-	}, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args, _ := request.Params.Arguments.(map[string]interface{})
-		data, err := callAPI("list_groups", args)
-		if err != nil {
-			return mcp.NewToolResultError(err.Error()), nil
-		}
-
-		jsonData, err := json.MarshalIndent(data, "", "  ")
-		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("Failed to format result: %v", err)), nil
-		}
-
-		return mcp.NewToolResultText(string(jsonData)), nil
-	})
+	}, handleToolCall("list_groups"))
 
 	// Register get_group tool
 	mcpServer.AddTool(mcp.Tool{
@@ -141,20 +152,7 @@ func main() {
 			},
 			Required: []string{"groupName"},
 		},
-	}, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args, _ := request.Params.Arguments.(map[string]interface{})
-		data, err := callAPI("get_group", args)
-		if err != nil {
-			return mcp.NewToolResultError(err.Error()), nil
-		}
-
-		jsonData, err := json.MarshalIndent(data, "", "  ")
-		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("Failed to format result: %v", err)), nil
-		}
-
-		return mcp.NewToolResultText(string(jsonData)), nil
-	})
+	}, handleToolCall("get_group"))
 
 	// Register list_apis_by_group tool
 	mcpServer.AddTool(mcp.Tool{
@@ -170,20 +168,7 @@ func main() {
 			},
 			Required: []string{"groupName"},
 		},
-	}, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args, _ := request.Params.Arguments.(map[string]interface{})
-		data, err := callAPI("list_apis_by_group", args)
-		if err != nil {
-			return mcp.NewToolResultError(err.Error()), nil
-		}
-
-		jsonData, err := json.MarshalIndent(data, "", "  ")
-		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("Failed to format result: %v", err)), nil
-		}
-
-		return mcp.NewToolResultText(string(jsonData)), nil
-	})
+	}, handleToolCall("list_apis_by_group"))
 
 	// Register get_api tool
 	mcpServer.AddTool(mcp.Tool{
@@ -199,20 +184,7 @@ func main() {
 			},
 			Required: []string{"apiId"},
 		},
-	}, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args, _ := request.Params.Arguments.(map[string]interface{})
-		data, err := callAPI("get_api", args)
-		if err != nil {
-			return mcp.NewToolResultError(err.Error()), nil
-		}
-
-		jsonData, err := json.MarshalIndent(data, "", "  ")
-		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("Failed to format result: %v", err)), nil
-		}
-
-		return mcp.NewToolResultText(string(jsonData)), nil
-	})
+	}, handleToolCall("get_api"))
 
 	// Register search_apis tool
 	mcpServer.AddTool(mcp.Tool{
@@ -228,20 +200,7 @@ func main() {
 			},
 			Required: []string{"query"},
 		},
-	}, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args, _ := request.Params.Arguments.(map[string]interface{})
-		data, err := callAPI("search_apis", args)
-		if err != nil {
-			return mcp.NewToolResultError(err.Error()), nil
-		}
-
-		jsonData, err := json.MarshalIndent(data, "", "  ")
-		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("Failed to format result: %v", err)), nil
-		}
-
-		return mcp.NewToolResultText(string(jsonData)), nil
-	})
+	}, handleToolCall("search_apis"))
 
 	// Register get_api_json_example tool
 	mcpServer.AddTool(mcp.Tool{
@@ -257,20 +216,7 @@ func main() {
 			},
 			Required: []string{"apiId"},
 		},
-	}, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args, _ := request.Params.Arguments.(map[string]interface{})
-		data, err := callAPI("get_api_json_example", args)
-		if err != nil {
-			return mcp.NewToolResultError(err.Error()), nil
-		}
-
-		jsonData, err := json.MarshalIndent(data, "", "  ")
-		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("Failed to format result: %v", err)), nil
-		}
-
-		return mcp.NewToolResultText(string(jsonData)), nil
-	})
+	}, handleToolCall("get_api_json_example"))
 
 	// Register resource
 	mcpServer.AddResource(

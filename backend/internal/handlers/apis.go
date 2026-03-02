@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/ProjAnvil/knot/backend/internal/models"
+	"github.com/ProjAnvil/knot/backend/internal/services"
 	"github.com/ProjAnvil/knot/backend/pkg/response"
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
@@ -266,77 +267,14 @@ func UpdateParameters(db *gorm.DB) fiber.Handler {
 			return response.BadRequest(c, "Invalid paramType")
 		}
 
-		// Parse parameters
-		var params []map[string]interface{}
-		if err := json.Unmarshal(body.Parameters, &params); err != nil {
-			return response.BadRequest(c, "Invalid parameters format")
+		// Use service to update parameters
+		paramService := services.NewParameterService(db)
+		count, err := paramService.UpdateParameters(uint(id), body.ParamType, body.Parameters)
+		if err != nil {
+			return response.InternalError(c, "Failed to update parameters")
 		}
 
-		// Delete existing parameters of this type
-		if err := db.Where("api_id = ? AND param_type = ?", id, body.ParamType).Delete(&models.Parameter{}).Error; err != nil {
-			return response.InternalError(c, "Failed to delete existing parameters")
-		}
-
-		if len(params) == 0 {
-			return response.Success(c, fiber.Map{"count": 0})
-		}
-
-		// Insert parameters recursively
-		order := 0
-		insertedCount := 0
-
-		var insertParams func(params []map[string]interface{}, parentID *uint) error
-		insertParams = func(params []map[string]interface{}, parentID *uint) error {
-			for _, param := range params {
-				name, _ := param["name"].(string)
-				paramType, _ := param["type"].(string)
-				description, _ := param["description"].(string)
-				required, _ := param["required"].(bool)
-
-				p := models.Parameter{
-					APIID:     uint(id),
-					ParentID:  parentID,
-					Name:      name,
-					Type:      paramType,
-					Required:  required,
-					ParamType: body.ParamType,
-					Order:     order,
-				}
-
-				if description != "" {
-					p.Description = &description
-				}
-
-				if err := db.Create(&p).Error; err != nil {
-					return err
-				}
-
-				order++
-				insertedCount++
-
-				// Handle children
-				if children, ok := param["children"].([]interface{}); ok && len(children) > 0 {
-					childParams := make([]map[string]interface{}, 0, len(children))
-					for _, child := range children {
-						if childMap, ok := child.(map[string]interface{}); ok {
-							childParams = append(childParams, childMap)
-						}
-					}
-					if len(childParams) > 0 {
-						if err := insertParams(childParams, &p.ID); err != nil {
-							return err
-						}
-					}
-				}
-			}
-			return nil
-		}
-
-		if err := insertParams(params, nil); err != nil {
-			return response.InternalError(c, "Failed to insert parameters")
-		}
-
-		return response.Success(c, fiber.Map{"count": insertedCount})
+		return response.Success(c, fiber.Map{"count": count})
 	}
 }
 
@@ -365,84 +303,13 @@ func UpdateParametersFromJSON(db *gorm.DB) fiber.Handler {
 			return response.BadRequest(c, "Invalid json object")
 		}
 
-		// Get existing parameters to preserve required status and descriptions
-		var existingParams []models.Parameter
-		db.Where("api_id = ? AND param_type = ?", id, body.ParamType).Find(&existingParams)
-
-		// Build a map of existing parameters by name
-		existingMap := make(map[string]*models.Parameter)
-		for i := range existingParams {
-			existingMap[existingParams[i].Name] = &existingParams[i]
-		}
-
-		// Delete existing parameters
-		db.Where("api_id = ? AND param_type = ?", id, body.ParamType).Delete(&models.Parameter{})
-
-		// Convert JSON to parameters
-		orderCounter := 0
-		var convertJSON func(obj map[string]interface{}, parentID *uint) error
-		convertJSON = func(obj map[string]interface{}, parentID *uint) error {
-			for key, value := range obj {
-				existing := existingMap[key]
-
-				var paramType string
-				var children map[string]interface{}
-
-				switch v := value.(type) {
-				case []interface{}:
-					paramType = "array"
-					if len(v) > 0 {
-						if obj, ok := v[0].(map[string]interface{}); ok {
-							children = obj
-						}
-					}
-				case map[string]interface{}:
-					paramType = "object"
-					children = v
-				case string:
-					paramType = "string"
-				case float64:
-					paramType = "number"
-				case bool:
-					paramType = "boolean"
-				default:
-					paramType = "string"
-				}
-
-				param := models.Parameter{
-					APIID:     uint(id),
-					ParentID:  parentID,
-					Name:      key,
-					Type:      paramType,
-					ParamType: body.ParamType,
-					Order:     orderCounter,
-					Required:  false,
-				}
-
-				if existing != nil {
-					param.Required = existing.Required
-					param.Description = existing.Description
-				}
-
-				if err := db.Create(&param).Error; err != nil {
-					return err
-				}
-
-				orderCounter++
-
-				if children != nil {
-					if err := convertJSON(children, &param.ID); err != nil {
-						return err
-					}
-				}
-			}
-			return nil
-		}
-
-		if err := convertJSON(body.JSON, nil); err != nil {
+		// Use service to update parameters from JSON
+		paramService := services.NewParameterService(db)
+		count, err := paramService.UpdateParametersFromJSON(uint(id), body.ParamType, body.JSON)
+		if err != nil {
 			return response.InternalError(c, "Failed to convert JSON to parameters")
 		}
 
-		return response.Success(c, fiber.Map{"parameterCount": len(body.JSON)})
+		return response.Success(c, fiber.Map{"parameterCount": count})
 	}
 }

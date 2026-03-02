@@ -1,11 +1,12 @@
 <script lang="ts">
-  import { ChevronDown, ChevronRight, GripVertical, MoreVertical, Pencil, Trash2 } from 'lucide-svelte'
+  import { ChevronDown, ChevronRight, GripVertical, MoreVertical, Pencil, Trash2, Search, X, ArrowUp, ArrowDown } from 'lucide-svelte'
   import { dndzone } from 'svelte-dnd-action'
   import { toast } from 'svelte-sonner'
   import { _ } from 'svelte-i18n'
   import type { GroupWithApis } from '$lib/types'
   import { updateApiOrders, updateGroupOrders } from '$lib/api'
   import { cn } from '$lib/utils'
+  import { performSearch, getExpandedGroups, navigateNext, navigatePrevious, isCurrentGroupResult, isCurrentApiResult, type SearchResult } from '$lib/search'
   import CreateGroupDialog from './dialogs/CreateGroupDialog.svelte'
   import DeleteGroupDialog from './dialogs/DeleteGroupDialog.svelte'
   import RenameGroupDialog from './dialogs/RenameGroupDialog.svelte'
@@ -13,6 +14,7 @@
   import ExportDialog from './dialogs/ExportDialog.svelte'
   import LanguageSwitcher from './LanguageSwitcher.svelte'
   import DropdownMenu from './ui/dropdown-menu.svelte'
+  import Input from './ui/input.svelte'
 
   let {
     groups = [],
@@ -38,9 +40,27 @@
   let apiDragDisabled = $state<Record<number, boolean>>({})
   let hasAutoExpanded = $state(false)
 
+  // Search state
+  let searchQuery = $state('')
+  let matchedGroupNames = $state<Set<string>>(new Set())
+  let matchedApiIds = $state<Set<number>>(new Set())
+  let searchResults = $state<SearchResult[]>([])
+  let currentResultIndex = $state(-1)
+
   // Update localGroups when groups change
   $effect(() => {
     localGroups = [...groups]
+  })
+
+  // Reset search results when query changes
+  $effect(() => {
+    if (searchQuery) {
+      // Reset results when query changes, so Enter will trigger new search
+      searchResults = []
+      currentResultIndex = -1
+      matchedGroupNames = new Set()
+      matchedApiIds = new Set()
+    }
   })
 
   // Auto-expand group only once when URL loads with selectedGroupId
@@ -64,6 +84,92 @@
       newSet.add(groupName)
     }
     expandedGroups = newSet
+  }
+
+  // Search function
+  function handleSearch() {
+    const searchState = performSearch(searchQuery, groups)
+
+    // If no results found, reset to default state (all groups visible but collapsed)
+    if (searchState.results.length === 0) {
+      matchedGroupNames = new Set()
+      matchedApiIds = new Set()
+      searchResults = []
+      currentResultIndex = -1
+      expandedGroups = new Set()
+    } else {
+      matchedGroupNames = searchState.matchedGroupNames
+      matchedApiIds = searchState.matchedApiIds
+      searchResults = searchState.results
+      currentResultIndex = 0
+      // Only expand groups that have matching results
+      expandedGroups = getExpandedGroups(searchState, groups)
+      // Navigate to first result
+      navigateToResult(0)
+    }
+  }
+
+  function clearSearch() {
+    searchQuery = ''
+    matchedGroupNames = new Set()
+    matchedApiIds = new Set()
+    searchResults = []
+    currentResultIndex = -1
+  }
+
+  // Navigate to a specific search result
+  function navigateToResult(index: number) {
+    if (searchResults.length === 0 || index < 0 || index >= searchResults.length) return
+
+    currentResultIndex = index
+    const result = searchResults[index]
+
+    if (result.type === 'api') {
+      // Select the API
+      selectApi(result.id)
+
+      // Scroll into view
+      setTimeout(() => {
+        const element = document.querySelector(`[data-api-id="${result.id}"]`)
+        element?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 100)
+    } else {
+      // For group results, just scroll to the group
+      setTimeout(() => {
+        const element = document.querySelector(`[data-group-id="${result.id}"]`)
+        element?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 100)
+    }
+  }
+
+  function handleNavigatePrevious() {
+    if (searchResults.length === 0) return
+    const newIndex = navigatePrevious(currentResultIndex, searchResults.length)
+    navigateToResult(newIndex)
+  }
+
+  function handleNavigateNext() {
+    if (searchResults.length === 0) return
+    const newIndex = navigateNext(currentResultIndex, searchResults.length)
+    navigateToResult(newIndex)
+  }
+
+  // Handle search input keydown
+  function handleSearchKeydown(e: KeyboardEvent) {
+    if (e.key === 'Enter') {
+      if (searchResults.length > 0) {
+        // If already searched, navigate to next/previous based on shift key
+        if (e.shiftKey) {
+          handleNavigatePrevious()
+        } else {
+          handleNavigateNext()
+        }
+      } else {
+        handleSearch()
+      }
+    } else if (e.key === 'Escape') {
+      clearSearch()
+    }
   }
 
   function selectApi(apiId: number) {
@@ -152,7 +258,57 @@
         <CreateGroupDialog onSuccess={onDataChange} />
       </div>
     </div>
-    <div class="mt-2">
+    <div class="mt-2 flex gap-2">
+      <div class="relative flex-1">
+        <Input
+          type="text"
+          bind:value={searchQuery}
+          onkeydown={handleSearchKeydown}
+          placeholder={$_('sidebar.searchPlaceholder')}
+          class={searchResults.length > 0 ? 'pr-28' : 'pr-16'}
+        />
+        <div class="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+          {#if searchResults.length > 0}
+            <span class="text-xs text-muted-foreground px-1 min-w-[2rem] text-center">
+              {currentResultIndex + 1}/{searchResults.length}
+            </span>
+            <button
+              onclick={handleNavigatePrevious}
+              class="h-7 w-7 flex items-center justify-center hover:bg-accent rounded-sm text-muted-foreground hover:text-foreground"
+              type="button"
+              title="Previous (Shift+Enter)"
+            >
+              <ArrowUp class="h-4 w-4" />
+            </button>
+            <button
+              onclick={handleNavigateNext}
+              class="h-7 w-7 flex items-center justify-center hover:bg-accent rounded-sm text-muted-foreground hover:text-foreground"
+              type="button"
+              title="Next (Enter)"
+            >
+              <ArrowDown class="h-4 w-4" />
+            </button>
+          {/if}
+          {#if searchQuery}
+            <button
+              onclick={clearSearch}
+              class="h-7 w-7 flex items-center justify-center hover:bg-accent rounded-sm text-muted-foreground hover:text-foreground"
+              type="button"
+              title="Clear"
+            >
+              <X class="h-4 w-4" />
+            </button>
+          {/if}
+          <button
+            onclick={handleSearch}
+            class="h-7 w-7 flex items-center justify-center hover:bg-accent rounded-sm text-muted-foreground hover:text-foreground"
+            type="button"
+            title="Search"
+          >
+            <Search class="h-4 w-4" />
+          </button>
+        </div>
+      </div>
       <ExportDialog {groups} />
     </div>
   </div>
@@ -169,11 +325,13 @@
         onfinalize={handleGroupDndFinalize}
       >
         {#each localGroups as group (group.id)}
-          <div class="mb-2">
+          <div class="mb-2" data-group-id={group.id}>
             <div
               class={cn(
                 'flex items-center p-2 cursor-pointer hover:bg-muted rounded-md select-none gap-2 w-full',
-                expandedGroups.has(group.name) && 'bg-muted'
+                expandedGroups.has(group.name) && 'bg-muted',
+                matchedGroupNames.has(group.name) && 'bg-yellow-100 dark:bg-yellow-900/30',
+                isCurrentGroupResult(searchResults, currentResultIndex, group.id) && 'ring-2 ring-primary'
               )}
               onclick={(e) => {
                 if (!e.defaultPrevented) {
@@ -260,11 +418,14 @@
                 >
                   {#each group.apis as api (api.id)}
                     <div
+                      data-api-id={api.id}
                       class={cn(
                         'flex items-center gap-2 p-2 text-sm rounded-md select-none mb-1 w-full',
                         selectedApiId === api.id
                           ? 'bg-primary/10 text-primary font-medium'
-                          : 'hover:bg-muted cursor-pointer'
+                          : 'hover:bg-muted cursor-pointer',
+                        matchedApiIds.has(api.id) && 'bg-yellow-100 dark:bg-yellow-900/30',
+                        isCurrentApiResult(searchResults, currentResultIndex, api.id) && 'ring-2 ring-primary'
                       )}
                       onclick={(e) => {
                         if (!e.defaultPrevented) {

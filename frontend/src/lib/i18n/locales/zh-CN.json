@@ -21,7 +21,9 @@
 		"title": "API 文档",
 		"createGroup": "新建分组",
 		"noGroups": "暂无分组",
-		"noApis": "暂无 API"
+		"noApis": "暂无 API",
+		"searchPlaceholder": "搜索分组或 API...",
+		"noResults": "未找到结果"
 	},
 	"group": {
 		"create": "创建分组",

@@ -21,7 +21,9 @@
 		"title": "API Documentation",
 		"createGroup": "New Group",
 		"noGroups": "No groups yet",
-		"noApis": "No APIs yet"
+		"noApis": "No APIs yet",
+		"searchPlaceholder": "Search groups or APIs...",
+		"noResults": "No results found"
 	},
 	"group": {
 		"create": "Create Group",

@@ -19,6 +19,6 @@ var setupCmd = &cobra.Command{
 			return
 		}
 
-		fmt.Println("\n✅ Setup complete! Run 'knot start' to start the server.\n")
+		fmt.Println("\n✅ Setup complete! Run 'knot start' to start the server.")
 	},
 }

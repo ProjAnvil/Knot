@@ -4,6 +4,7 @@
   import { Share2, Check } from 'lucide-svelte'
   import type { ApiData, ParameterWithChildren } from '$lib/types'
   import { updateApiParametersFromJson, updateApiParametersFromStructure } from '$lib/api'
+  import { copyToClipboard } from '$lib/utils'
   import Badge from './ui/badge.svelte'
   import EditableApiName from './doc-viewer/EditableApiName.svelte'
   import EditableEndpoint from './doc-viewer/EditableEndpoint.svelte'
@@ -156,61 +157,17 @@
 
   let copied = $state(false)
 
-  // Fallback copy method for non-HTTPS environments
-  function fallbackCopyTextToClipboard(text: string): boolean {
-    const textArea = document.createElement('textarea')
-    textArea.value = text
-    textArea.style.position = 'fixed'
-    textArea.style.top = '0'
-    textArea.style.left = '0'
-    textArea.style.width = '2em'
-    textArea.style.height = '2em'
-    textArea.style.padding = '0'
-    textArea.style.border = 'none'
-    textArea.style.outline = 'none'
-    textArea.style.boxShadow = 'none'
-    textArea.style.background = 'transparent'
-    
-    document.body.appendChild(textArea)
-    textArea.focus()
-    textArea.select()
-
-    try {
-      const successful = document.execCommand('copy')
-      document.body.removeChild(textArea)
-      return successful
-    } catch (err) {
-      console.error('Fallback: Oops, unable to copy', err)
-      document.body.removeChild(textArea)
-      return false
-    }
-  }
-
   async function handleShare() {
     const url = new URL(window.location.href)
     url.searchParams.set('api', apiData.id.toString())
     const shareUrl = url.toString()
 
-    let success = false
-
-    // Try modern clipboard API first
-    if (navigator.clipboard && window.isSecureContext) {
-      try {
-        await navigator.clipboard.writeText(shareUrl)
-        success = true
-      } catch (error) {
-        console.error('Clipboard API failed, trying fallback:', error)
-        success = fallbackCopyTextToClipboard(shareUrl)
-      }
-    } else {
-      // Use fallback for non-HTTPS or older browsers
-      success = fallbackCopyTextToClipboard(shareUrl)
-    }
+    const success = await copyToClipboard(shareUrl)
 
     if (success) {
       copied = true
       toast.success($_('docViewer.linkCopied') || 'Link copied to clipboard!')
-      
+
       setTimeout(() => {
         copied = false
       }, 2000)

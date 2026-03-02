@@ -24,7 +24,7 @@ var statusCmd = &cobra.Command{
 			return
 		}
 
-		fmt.Println("\n📊 Knot Server Status\n")
+		fmt.Println("\n📊 Knot Server Status")
 
 		if pid == 0 {
 			fmt.Println("Status:  ⭕ Not running")

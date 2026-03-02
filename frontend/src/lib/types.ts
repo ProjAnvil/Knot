@@ -33,11 +33,19 @@ export interface Parameter {
 }
 
 export interface ParameterWithChildren extends Parameter {
-	children?: ParameterWithChildren[]
+	children: ParameterWithChildren[]
 }
 
 export interface GroupWithApis extends Group {
 	apis: Api[]
+}
+
+// Raw API response from backend (before transformation)
+export interface ApiRawResponse extends Omit<Api, 'method'> {
+	group?: Group
+	groupId: number
+	method: string | null
+	parameters: Parameter[]
 }
 
 export interface ApiData extends Api {
@@ -46,7 +54,7 @@ export interface ApiData extends Api {
 	responseParameters: ParameterWithChildren[]
 }
 
-export interface ApiResult<T = any> {
+export interface ApiResult<T = void> {
 	success: boolean
 	data?: T
 	error?: string

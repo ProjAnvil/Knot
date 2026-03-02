@@ -1,6 +1,6 @@
 // API service functions for communicating with backend
 
-import type { Api, ApiData, ApiResult, Group, GroupWithApis, ParameterWithChildren } from './types'
+import type { Api, ApiData, ApiRawResponse, ApiResult, Group, GroupWithApis, Parameter, ParameterWithChildren } from './types'
 
 const API_BASE = '/api'
 
@@ -70,48 +70,57 @@ export async function deleteGroup(id: number): Promise<ApiResult<void>> {
 	}
 }
 
+// Build hierarchical structure for nested parameters
+function buildParameterTree(params: Parameter[]): ParameterWithChildren[] {
+	const map = new Map<number, ParameterWithChildren>()
+	const roots: ParameterWithChildren[] = []
+
+	// First pass: create all nodes with empty children
+	params.forEach((param) => {
+		map.set(param.id, { ...param, children: [] })
+	})
+
+	// Second pass: build tree structure
+	params.forEach((param) => {
+		const node = map.get(param.id)
+		if (node) {
+			if (param.parentId === null) {
+				roots.push(node)
+			} else {
+				const parent = map.get(param.parentId)
+				if (parent) {
+					parent.children.push(node)
+				}
+			}
+		}
+	})
+
+	return roots
+}
+
 // APIs API
 export async function getApi(id: number): Promise<ApiResult<ApiData>> {
 	try {
 		const response = await fetch(`${API_BASE}/apis/${id}`)
-		const result = await handleResponse<any>(response)
+		const result = await handleResponse<ApiRawResponse>(response)
 
 		if (result.success && result.data) {
 			// Transform parameters array into requestParameters and responseParameters
 			const parameters = result.data.parameters || []
-			const requestParameters = parameters.filter((p: any) => p.paramType === 'request')
-			const responseParameters = parameters.filter((p: any) => p.paramType === 'response')
+			const requestParameters = parameters.filter((p) => p.paramType === 'request')
+			const responseParameters = parameters.filter((p) => p.paramType === 'response')
 
-			// Build hierarchical structure for nested parameters
-			const buildTree = (params: any[]) => {
-				const map = new Map()
-				const roots: any[] = []
-
-				params.forEach((param) => map.set(param.id, { ...param, children: [] }))
-
-				params.forEach((param) => {
-					const node = map.get(param.id)
-					if (param.parentId === null) {
-						roots.push(node)
-					} else {
-						const parent = map.get(param.parentId)
-						if (parent) {
-							parent.children.push(node)
-						}
-					}
-				})
-
-				return roots
-			}
-
-			result.data = {
+			const apiData: ApiData = {
 				...result.data,
-				requestParameters: buildTree(requestParameters),
-				responseParameters: buildTree(responseParameters),
+				method: result.data.method || '',
+				requestParameters: buildParameterTree(requestParameters),
+				responseParameters: buildParameterTree(responseParameters),
 			}
+
+			return { success: true, data: apiData }
 		}
 
-		return result
+		return { success: false, error: result.error }
 	} catch (error) {
 		return { success: false, error: String(error) }
 	}

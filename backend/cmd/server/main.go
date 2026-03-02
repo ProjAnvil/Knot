@@ -35,7 +35,6 @@ func main() {
 	db, err := database.InitDatabase(cfg)
 	if err != nil {
 		logger.Log.Fatal(fmt.Sprintf("Failed to initialize database: %v", err))
-		log.Fatalf("Failed to initialize database: %v", err)
 	}
 
 	// Create Fiber app
@@ -47,13 +46,35 @@ func main() {
 	app.Use(recover.New())
 	app.Use(cors.New())
 
-	// Health check
+	// Health check with database status
 	app.Get("/api/health", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{
+		// Check database connection
+		dbStatus := "ok"
+		dbError := ""
+		sqlDB, err := db.DB()
+		if err != nil {
+			dbStatus = "error"
+			dbError = err.Error()
+		} else if err := sqlDB.Ping(); err != nil {
+			dbStatus = "error"
+			dbError = err.Error()
+		}
+
+		response := fiber.Map{
 			"status":    "ok",
 			"runtime":   "go",
 			"timestamp": time.Now().Format(time.RFC3339),
-		})
+			"database": fiber.Map{
+				"status": dbStatus,
+				"type":   cfg.DatabaseType,
+			},
+		}
+
+		if dbError != "" {
+			response["database"].(fiber.Map)["error"] = dbError
+		}
+
+		return c.JSON(response)
 	})
 
 	// API routes
@@ -119,6 +140,5 @@ func main() {
 
 	if err := app.Listen(addr); err != nil {
 		logger.Log.Fatal(fmt.Sprintf("Failed to start server: %v", err))
-		log.Fatalf("Failed to start server: %v", err)
 	}
 }
