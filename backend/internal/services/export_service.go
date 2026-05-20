@@ -1,13 +1,29 @@
 package services
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/ProjAnvil/knot/backend/internal/models"
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/extension"
 )
+
+// renderMarkdownToHTML converts Markdown text to HTML using goldmark with GFM support.
+// Returns an empty string if conversion fails.
+func renderMarkdownToHTML(md string) string {
+	markdown := goldmark.New(
+		goldmark.WithExtensions(extension.GFM),
+	)
+	var buf bytes.Buffer
+	if err := markdown.Convert([]byte(md), &buf); err != nil {
+		return ""
+	}
+	return buf.String()
+}
 
 // BuildParameterTree builds a hierarchical tree structure from flat parameter list
 func BuildParameterTree(params []models.Parameter) []models.Parameter {
@@ -181,6 +197,7 @@ func GenerateHTML(apis []APIWithParams, locale string) string {
 	requestExample := "Request Example"
 	responseExample := "Response Example"
 	tableOfContents := "Table of Contents"
+	noteHeading := "Note"
 
 	if locale == "zh" {
 		title = "API 文档"
@@ -190,6 +207,7 @@ func GenerateHTML(apis []APIWithParams, locale string) string {
 		requestExample = "请求示例"
 		responseExample = "响应示例"
 		tableOfContents = "目录"
+		noteHeading = "备注"
 	}
 
 	// Group APIs by group
@@ -261,12 +279,14 @@ func GenerateHTML(apis []APIWithParams, locale string) string {
             <span class="badge badge-type">%s</span>
           </div>
         </div>
+`, index, api.API.Name, strings.ToLower(api.API.Method), api.API.Method, api.API.Endpoint, api.API.Type))
 
+			apisHTML.WriteString(fmt.Sprintf(`
         <div class="section">
           <h3>%s</h3>
           %s
         </div>
-`, index, api.API.Name, strings.ToLower(api.API.Method), api.API.Method, api.API.Endpoint, api.API.Type, requestParams, GenerateParameterHTML(requestTree, 0)))
+`, requestParams, GenerateParameterHTML(requestTree, 0)))
 
 		if len(requestJSON) > 0 {
 			apisHTML.WriteString(fmt.Sprintf(`
@@ -291,6 +311,16 @@ func GenerateHTML(apis []APIWithParams, locale string) string {
           <pre><code>%s</code></pre>
         </div>
 `, responseExample, string(responseJSONBytes)))
+		}
+
+		if api.API.Note != nil && *api.API.Note != "" {
+			noteHTML := renderMarkdownToHTML(*api.API.Note)
+			apisHTML.WriteString(fmt.Sprintf(`
+        <div class="section">
+          <h3>%s</h3>
+          <div class="note-content">%s</div>
+        </div>
+`, noteHeading, noteHTML))
 		}
 
 		apisHTML.WriteString(`      </div>`)
@@ -501,6 +531,60 @@ func GenerateHTML(apis []APIWithParams, locale string) string {
     code {
       font-family: 'Monaco', 'Menlo', monospace;
     }
+    .note-content {
+      font-size: 0.95em;
+      line-height: 1.7;
+      color: #374151;
+    }
+    .note-content h1 { font-size: 1.5em; margin: 16px 0 8px; font-weight: 700; color: #1a1a1a; }
+    .note-content h2 { font-size: 1.3em; margin: 14px 0 6px; font-weight: 700; color: #1a1a1a; }
+    .note-content h3 { font-size: 1.15em; margin: 12px 0 4px; font-weight: 600; color: #333; }
+    .note-content h4 { font-size: 1em; margin: 10px 0 4px; font-weight: 600; color: #333; }
+    .note-content p { margin: 8px 0; }
+    .note-content a { color: #0070f3; text-decoration: underline; }
+    .note-content code {
+      background: #f3f4f6;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 0.9em;
+    }
+    .note-content pre {
+      background: #2d2d2d;
+      color: #f8f8f2;
+      padding: 16px;
+      border-radius: 6px;
+      overflow-x: auto;
+      margin: 12px 0;
+    }
+    .note-content pre code {
+      background: none;
+      padding: 0;
+      color: inherit;
+    }
+    .note-content ul, .note-content ol { padding-left: 24px; margin: 8px 0; }
+    .note-content li { margin: 4px 0; }
+    .note-content blockquote {
+      border-left: 3px solid #d1d5db;
+      padding-left: 16px;
+      margin: 12px 0;
+      color: #6b7280;
+    }
+    .note-content table {
+      width: 100%%;
+      border-collapse: collapse;
+      margin: 12px 0;
+    }
+    .note-content th, .note-content td {
+      border: 1px solid #e5e7eb;
+      padding: 8px 12px;
+      text-align: left;
+    }
+    .note-content th { background: #f9fafb; font-weight: 600; }
+    .note-content hr { border: none; border-top: 1px solid #e5e7eb; margin: 16px 0; }
+    .note-content strong { font-weight: 700; }
+    .note-content em { font-style: italic; }
+    .note-content del { text-decoration: line-through; color: #9ca3af; }
     @media print {
       body { display: block; }
       .sidebar { display: none; }
