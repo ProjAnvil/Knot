@@ -32,19 +32,7 @@ func setupAPIsTestApp(db *gorm.DB) *fiber.App {
 		},
 	})
 
-	// Setup API routes - matching the actual server routes
-	api := app.Group("/api")
-	apis := api.Group("/apis")
-	apis.Get("/:id", GetAPI(db))
-	apis.Get("/group/:groupId", GetAPIsByGroup(db))
-	apis.Post("/", CreateAPI(db))
-	apis.Patch("/:id", UpdateAPI(db))
-	apis.Patch("/:id/note", UpdateAPINote(db))
-	apis.Post("/orders", UpdateAPIOrders(db))
-	apis.Post("/:id/duplicate", DuplicateAPI(db))
-	apis.Delete("/:id", DeleteAPI(db))
-	apis.Put("/:id/parameters", UpdateParameters(db))
-	apis.Post("/:id/parameters/from-json", UpdateParametersFromJSON(db))
+	SetupRoutes(app, db)
 
 	return app
 }

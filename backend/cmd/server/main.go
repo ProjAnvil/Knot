@@ -17,13 +17,11 @@ import (
 )
 
 func main() {
-	// Load configuration
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	// Initialize logger
 	if err := logger.InitLogger(cfg); err != nil {
 		log.Fatalf("Failed to initialize logger: %v", err)
 	}
@@ -31,24 +29,17 @@ func main() {
 
 	logger.Log.Info("Starting Knot server...")
 
-	// Initialize database
 	db, err := database.InitDatabase(cfg)
 	if err != nil {
 		logger.Log.Fatal(fmt.Sprintf("Failed to initialize database: %v", err))
 	}
 
-	// Create Fiber app
-	app := fiber.New(fiber.Config{
-		AppName: "Knot",
-	})
-
-	// Middleware
+	app := fiber.New(fiber.Config{AppName: "Knot"})
 	app.Use(recover.New())
 	app.Use(cors.New())
 
 	// Health check with database status
 	app.Get("/api/health", func(c *fiber.Ctx) error {
-		// Check database connection
 		dbStatus := "ok"
 		dbError := ""
 		sqlDB, err := db.DB()
@@ -60,7 +51,7 @@ func main() {
 			dbError = err.Error()
 		}
 
-		response := fiber.Map{
+		resp := fiber.Map{
 			"status":    "ok",
 			"runtime":   "go",
 			"timestamp": time.Now().Format(time.RFC3339),
@@ -69,46 +60,13 @@ func main() {
 				"type":   cfg.DatabaseType,
 			},
 		}
-
 		if dbError != "" {
-			response["database"].(fiber.Map)["error"] = dbError
+			resp["database"].(fiber.Map)["error"] = dbError
 		}
-
-		return c.JSON(response)
+		return c.JSON(resp)
 	})
 
-	// API routes
-	api := app.Group("/api")
-
-	// Groups routes
-	groups := api.Group("/groups")
-	groups.Get("/", handlers.GetGroups(db))
-	groups.Get("/with-apis", handlers.GetGroupsWithAPIs(db))
-	groups.Post("/orders", handlers.UpdateGroupOrders(db))
-	groups.Post("/", handlers.CreateGroup(db))
-	groups.Patch("/:id", handlers.UpdateGroup(db))
-	groups.Delete("/:id", handlers.DeleteGroup(db))
-
-	// APIs routes
-	apis := api.Group("/apis")
-	apis.Get("/:id", handlers.GetAPI(db))
-	apis.Get("/group/:groupId", handlers.GetAPIsByGroup(db))
-	apis.Post("/", handlers.CreateAPI(db))
-	apis.Patch("/:id", handlers.UpdateAPI(db))
-	apis.Patch("/:id/note", handlers.UpdateAPINote(db))
-	apis.Post("/orders", handlers.UpdateAPIOrders(db))
-	apis.Post("/:id/duplicate", handlers.DuplicateAPI(db))
-	apis.Delete("/:id", handlers.DeleteAPI(db))
-	apis.Put("/:id/parameters", handlers.UpdateParameters(db))
-	apis.Post("/:id/parameters/from-json", handlers.UpdateParametersFromJSON(db))
-
-	// Export routes
-	export := api.Group("/export")
-	export.Post("/", handlers.ExportAPIs(db))
-
-	// MCP Tools routes
-	mcpTools := api.Group("/mcp-tools")
-	mcpTools.Post("/", handlers.HandleMCPTools(db))
+	handlers.SetupRoutes(app, db)
 
 	// Static file serving for frontend (only if embedded)
 	if embedded.HasFrontend() {
@@ -124,12 +82,10 @@ func main() {
 		fmt.Printf("   This is normal for knot-server. Use CLI to start with frontend.\n")
 	}
 
-	// Get port and host from config or environment
 	port := cfg.Port
 	if envPort := os.Getenv("PORT"); envPort != "" {
 		fmt.Sscanf(envPort, "%d", &port)
 	}
-
 	host := cfg.Host
 	if envHost := os.Getenv("HOST"); envHost != "" {
 		host = envHost
