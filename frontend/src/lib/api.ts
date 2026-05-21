@@ -158,6 +158,17 @@ export async function updateApi(id: number, data: Partial<Api>): Promise<ApiResu
 	}
 }
 
+export async function duplicateApi(id: number): Promise<ApiResult<Api>> {
+	try {
+		const response = await fetch(`${API_BASE}/apis/${id}/duplicate`, {
+			method: 'POST',
+		})
+		return await handleResponse<Api>(response)
+	} catch (error) {
+		return { success: false, error: String(error) }
+	}
+}
+
 export async function deleteApi(id: number): Promise<ApiResult<void>> {
 	try {
 		const response = await fetch(`${API_BASE}/apis/${id}`, {

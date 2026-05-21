@@ -1,14 +1,10 @@
 <script lang="ts">
   import { _ } from 'svelte-i18n'
-  import { toast } from 'svelte-sonner'
-  import { Share2, Check } from 'lucide-svelte'
   import type { ApiData, ParameterWithChildren } from '$lib/types'
   import { updateApiParametersFromJson, updateApiParametersFromStructure } from '$lib/api'
-  import { copyToClipboard } from '$lib/utils'
   import Badge from './ui/badge.svelte'
   import EditableApiName from './doc-viewer/EditableApiName.svelte'
   import EditableEndpoint from './doc-viewer/EditableEndpoint.svelte'
-  import DeleteApiDialog from './doc-viewer/DeleteApiDialog.svelte'
   import EditableJson from './doc-viewer/EditableJson.svelte'
   import EditableNote from './doc-viewer/EditableNote.svelte'
   import EditableParameterTable from './doc-viewer/EditableParameterTable.svelte'
@@ -16,7 +12,6 @@
   let {
     apiData,
     onDataChange,
-    onStructuralChange
   }: {
     apiData: ApiData
     onDataChange?: () => void
@@ -154,27 +149,6 @@
 
     return result
   }
-
-  let copied = $state(false)
-
-  async function handleShare() {
-    const url = new URL(window.location.href)
-    url.searchParams.set('api', apiData.id.toString())
-    const shareUrl = url.toString()
-
-    const success = await copyToClipboard(shareUrl)
-
-    if (success) {
-      copied = true
-      toast.success($_('docViewer.linkCopied') || 'Link copied to clipboard!')
-
-      setTimeout(() => {
-        copied = false
-      }, 2000)
-    } else {
-      toast.error($_('docViewer.copyFailed') || 'Failed to copy link')
-    }
-  }
 </script>
 
 <div class="p-6 space-y-6">
@@ -182,34 +156,12 @@
   <div class="space-y-4">
     <div class="flex items-center gap-3">
       <EditableApiName apiId={apiData.id} apiName={apiData.name} onDataChange={onDataChange} />
-      <Badge variant="secondary" class="text-sm px-3 py-1">
-        {apiData.type}
-      </Badge>
-      <button
-        onclick={handleShare}
-        class="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
-        title={$_('docViewer.shareLink') || 'Share link'}
-      >
-        {#if copied}
-          <Check class="h-4 w-4 text-green-600" />
-          <span class="text-green-600">{$_('docViewer.copied') || 'Copied!'}</span>
-        {:else}
-          <Share2 class="h-4 w-4" />
-          <span>{$_('docViewer.share') || 'Share'}</span>
-        {/if}
-      </button>
-      <DeleteApiDialog
-        apiId={apiData.id}
-        apiName={apiData.name}
-        onDelete={() => {
-          onStructuralChange?.()
-          // Clear selected API after deletion
-          window.location.href = '/'
-        }}
-      />
     </div>
 
     <div class="flex items-center gap-3">
+      <Badge variant="secondary" class="text-sm px-3 py-1">
+        {apiData.type}
+      </Badge>
       {#if apiData.method}
         <Badge class={getMethodColorClasses(apiData.method)}>
           {apiData.method}

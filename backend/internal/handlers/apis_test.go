@@ -41,6 +41,7 @@ func setupAPIsTestApp(db *gorm.DB) *fiber.App {
 	apis.Patch("/:id", UpdateAPI(db))
 	apis.Patch("/:id/note", UpdateAPINote(db))
 	apis.Post("/orders", UpdateAPIOrders(db))
+	apis.Post("/:id/duplicate", DuplicateAPI(db))
 	apis.Delete("/:id", DeleteAPI(db))
 	apis.Put("/:id/parameters", UpdateParameters(db))
 	apis.Post("/:id/parameters/from-json", UpdateParametersFromJSON(db))
@@ -989,5 +990,283 @@ func TestUpdateParametersFromJSON(t *testing.T) {
 
 		assert.False(t, respBody.Success)
 		assert.Contains(t, respBody.Error, "Invalid paramType")
+	})
+}
+
+// TestDuplicateAPI tests the DuplicateAPI handler
+func TestDuplicateAPI(t *testing.T) {
+	t.Run("givenValidAPI_whenDuplicateAPI_thenCreatesCopyWithSuffix", func(t *testing.T) {
+		db := setupTestDB(t)
+		app := setupAPIsTestApp(db)
+
+		group := models.Group{Name: "Test Group", Order: 1}
+		db.Create(&group)
+
+		note := "Some note"
+		testAPI := models.API{
+			GroupID:  group.ID,
+			Name:     "Login",
+			Endpoint: "/api/login",
+			Method:   "POST",
+			Type:     "HTTP",
+			Note:     &note,
+			Order:    1,
+		}
+		db.Create(&testAPI)
+
+		req := httptest.NewRequest("POST", "/api/apis/1/duplicate", nil)
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+
+		assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+
+		var respBody response.Response
+		err = json.NewDecoder(resp.Body).Decode(&respBody)
+		require.NoError(t, err)
+
+		assert.True(t, respBody.Success)
+
+		apiData := respBody.Data.(map[string]interface{})
+		assert.Equal(t, "Login - copy", apiData["name"])
+		assert.Equal(t, "/api/login", apiData["endpoint"])
+		assert.Equal(t, "POST", apiData["method"])
+		assert.Equal(t, "HTTP", apiData["type"])
+		assert.Equal(t, "Some note", apiData["note"])
+		assert.Equal(t, float64(2), apiData["order"])
+
+		var sourceAPI models.API
+		db.First(&sourceAPI, 1)
+		assert.Equal(t, "Login", sourceAPI.Name)
+	})
+
+	t.Run("givenAPIWithParameters_whenDuplicateAPI_thenParametersAreCopied", func(t *testing.T) {
+		db := setupTestDB(t)
+		app := setupAPIsTestApp(db)
+
+		group := models.Group{Name: "Test Group", Order: 1}
+		db.Create(&group)
+
+		testAPI := models.API{
+			GroupID:  group.ID,
+			Name:     "User API",
+			Endpoint: "/api/users",
+			Method:   "POST",
+			Type:     "HTTP",
+			Order:    1,
+		}
+		db.Create(&testAPI)
+
+		parent := models.Parameter{
+			APIID:     testAPI.ID,
+			Name:      "user",
+			Type:      "object",
+			ParamType: "request",
+			Order:     0,
+		}
+		db.Create(&parent)
+
+		child1 := models.Parameter{
+			APIID:     testAPI.ID,
+			ParentID:  &parent.ID,
+			Name:      "name",
+			Type:      "string",
+			ParamType: "request",
+			Order:     1,
+		}
+		child2 := models.Parameter{
+			APIID:     testAPI.ID,
+			ParentID:  &parent.ID,
+			Name:      "email",
+			Type:      "string",
+			ParamType: "request",
+			Order:     2,
+		}
+		db.Create(&child1)
+		db.Create(&child2)
+
+		respParam := models.Parameter{
+			APIID:     testAPI.ID,
+			Name:      "token",
+			Type:      "string",
+			ParamType: "response",
+			Order:     0,
+		}
+		db.Create(&respParam)
+
+		req := httptest.NewRequest("POST", "/api/apis/1/duplicate", nil)
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+
+		assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+
+		var dupAPI models.API
+		db.Preload("Parameters", func(db *gorm.DB) *gorm.DB {
+			return db.Order("`order` ASC")
+		}).Where("name = ?", "User API - copy").First(&dupAPI)
+
+		assert.Equal(t, uint(2), dupAPI.ID)
+		assert.Len(t, dupAPI.Parameters, 4)
+
+		var newParent *models.Parameter
+		for _, p := range dupAPI.Parameters {
+			if p.Name == "user" && p.ParamType == "request" && p.ParentID == nil {
+				newParent = &p
+				break
+			}
+		}
+		require.NotNil(t, newParent)
+
+		var children []models.Parameter
+		db.Where("parent_id = ? AND api_id = ?", newParent.ID, dupAPI.ID).Find(&children)
+		assert.Len(t, children, 2)
+
+		var sourceParams []models.Parameter
+		db.Where("api_id = ?", 1).Find(&sourceParams)
+		assert.Len(t, sourceParams, 4)
+	})
+
+	t.Run("givenAPIWithNoParameters_whenDuplicateAPI_thenCreatesAPIWithoutParameters", func(t *testing.T) {
+		db := setupTestDB(t)
+		app := setupAPIsTestApp(db)
+
+		group := models.Group{Name: "Test Group", Order: 1}
+		db.Create(&group)
+
+		testAPI := models.API{
+			GroupID:  group.ID,
+			Name:     "Simple API",
+			Endpoint: "/api/simple",
+			Method:   "GET",
+			Type:     "HTTP",
+			Order:    1,
+		}
+		db.Create(&testAPI)
+
+		req := httptest.NewRequest("POST", "/api/apis/1/duplicate", nil)
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+
+		assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+
+		var respBody response.Response
+		err = json.NewDecoder(resp.Body).Decode(&respBody)
+		require.NoError(t, err)
+
+		assert.True(t, respBody.Success)
+
+		apiData := respBody.Data.(map[string]interface{})
+		assert.Equal(t, "Simple API - copy", apiData["name"])
+
+		var params []models.Parameter
+		db.Where("api_id = ?", 2).Find(&params)
+		assert.Empty(t, params)
+	})
+
+	t.Run("givenNonExistentAPI_whenDuplicateAPI_thenReturnsNotFound", func(t *testing.T) {
+		db := setupTestDB(t)
+		app := setupAPIsTestApp(db)
+
+		req := httptest.NewRequest("POST", "/api/apis/999/duplicate", nil)
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+
+		assert.Equal(t, fiber.StatusNotFound, resp.StatusCode)
+
+		var respBody response.Response
+		err = json.NewDecoder(resp.Body).Decode(&respBody)
+		require.NoError(t, err)
+
+		assert.False(t, respBody.Success)
+		assert.Contains(t, respBody.Error, "API not found")
+	})
+
+	t.Run("givenInvalidAPIID_whenDuplicateAPI_thenReturnsBadRequest", func(t *testing.T) {
+		db := setupTestDB(t)
+		app := setupAPIsTestApp(db)
+
+		req := httptest.NewRequest("POST", "/api/apis/invalid/duplicate", nil)
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+
+		assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
+
+		var respBody response.Response
+		err = json.NewDecoder(resp.Body).Decode(&respBody)
+		require.NoError(t, err)
+
+		assert.False(t, respBody.Success)
+		assert.Contains(t, respBody.Error, "Invalid API ID")
+	})
+
+	t.Run("givenExistingAPIsInGroup_whenDuplicateAPI_thenOrderIsIncremented", func(t *testing.T) {
+		db := setupTestDB(t)
+		app := setupAPIsTestApp(db)
+
+		group := models.Group{Name: "Test Group", Order: 1}
+		db.Create(&group)
+
+		api1 := models.API{
+			GroupID:  group.ID,
+			Name:     "API 1",
+			Endpoint: "/api/1",
+			Method:   "GET",
+			Type:     "HTTP",
+			Order:    1,
+		}
+		api2 := models.API{
+			GroupID:  group.ID,
+			Name:     "API 2",
+			Endpoint: "/api/2",
+			Method:   "POST",
+			Type:     "HTTP",
+			Order:    2,
+		}
+		db.Create(&api1)
+		db.Create(&api2)
+
+		req := httptest.NewRequest("POST", "/api/apis/1/duplicate", nil)
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+
+		assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+
+		var respBody response.Response
+		err = json.NewDecoder(resp.Body).Decode(&respBody)
+		require.NoError(t, err)
+
+		apiData := respBody.Data.(map[string]interface{})
+		assert.Equal(t, float64(3), apiData["order"])
+	})
+
+	t.Run("givenRPCTypeAPI_whenDuplicateAPI_thenTypeIsPreserved", func(t *testing.T) {
+		db := setupTestDB(t)
+		app := setupAPIsTestApp(db)
+
+		group := models.Group{Name: "Test Group", Order: 1}
+		db.Create(&group)
+
+		testAPI := models.API{
+			GroupID:  group.ID,
+			Name:     "RPC Method",
+			Endpoint: "/rpc/method",
+			Method:   "",
+			Type:     "RPC",
+			Order:    1,
+		}
+		db.Create(&testAPI)
+
+		req := httptest.NewRequest("POST", "/api/apis/1/duplicate", nil)
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+
+		assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+
+		var respBody response.Response
+		err = json.NewDecoder(resp.Body).Decode(&respBody)
+		require.NoError(t, err)
+
+		apiData := respBody.Data.(map[string]interface{})
+		assert.Equal(t, "RPC Method - copy", apiData["name"])
+		assert.Equal(t, "RPC", apiData["type"])
 	})
 }

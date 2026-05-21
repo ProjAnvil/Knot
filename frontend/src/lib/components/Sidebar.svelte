@@ -1,10 +1,11 @@
 <script lang="ts">
-  import { ChevronDown, ChevronRight, GripVertical, MoreVertical, Pencil, Trash2, Search, X, ArrowUp, ArrowDown } from 'lucide-svelte'
+  import { ChevronDown, ChevronRight, GripVertical, MoreVertical, Pencil, Trash2, Search, X, ArrowUp, ArrowDown, Copy, Share2 } from 'lucide-svelte'
   import { dndzone } from 'svelte-dnd-action'
   import { toast } from 'svelte-sonner'
   import { _ } from 'svelte-i18n'
   import type { GroupWithApis } from '$lib/types'
-  import { updateApiOrders, updateGroupOrders } from '$lib/api'
+  import { updateApiOrders, updateGroupOrders, duplicateApi, deleteApi } from '$lib/api'
+  import { copyToClipboard } from '$lib/utils'
   import { cn } from '$lib/utils'
   import { performSearch, getExpandedGroups, navigateNext, navigatePrevious, isCurrentGroupResult, isCurrentApiResult, type SearchResult } from '$lib/search'
   import CreateGroupDialog from './dialogs/CreateGroupDialog.svelte'
@@ -15,6 +16,8 @@
   import LanguageSwitcher from './LanguageSwitcher.svelte'
   import DropdownMenu from './ui/dropdown-menu.svelte'
   import Input from './ui/input.svelte'
+  import AlertDialog from './ui/alert-dialog.svelte'
+  import Button from './ui/button.svelte'
 
   let {
     groups = [],
@@ -247,6 +250,54 @@
       onDataChange?.()
     }
   }
+
+  function closeOpenDropdown() {
+    document.querySelector('.fixed.inset-0.z-40')?.click()
+  }
+
+  async function handleApiDuplicate(apiId: number) {
+    closeOpenDropdown()
+    const result = await duplicateApi(apiId)
+    if (result.success) {
+      toast.success($_('api.duplicateSuccess'))
+      onDataChange?.()
+    } else {
+      toast.error(result.error || $_('api.duplicateError'))
+    }
+  }
+
+  async function handleApiShare(apiId: number) {
+    closeOpenDropdown()
+    const url = new URL(window.location.href)
+    url.searchParams.set('api', apiId.toString())
+    const success = await copyToClipboard(url.toString())
+    if (success) {
+      toast.success($_('docViewer.linkCopied'))
+    } else {
+      toast.error($_('docViewer.copyFailed'))
+    }
+  }
+
+  let deleteApiDialogOpen = $state(false)
+  let selectedApiForDelete = $state<{ id: number; name: string } | null>(null)
+
+  function openDeleteApiDialog(apiId: number, apiName: string) {
+    selectedApiForDelete = { id: apiId, name: apiName }
+    deleteApiDialogOpen = true
+  }
+
+  async function handleDeleteApi() {
+    if (!selectedApiForDelete) return
+    const result = await deleteApi(selectedApiForDelete.id)
+    if (result.success) {
+      toast.success($_('api.deleteSuccess'))
+      deleteApiDialogOpen = false
+      selectedApiForDelete = null
+      onDataChange?.()
+    } else {
+      toast.error(result.error || $_('api.deleteError'))
+    }
+  }
 </script>
 
 <div class="flex flex-col h-full">
@@ -440,7 +491,7 @@
                         }
                       }}
                     >
-                      <div 
+                      <div
                         class="cursor-grab active:cursor-grabbing p-1 hover:bg-accent rounded shrink-0"
                         onmouseenter={() => apiDragDisabled = { ...apiDragDisabled, [group.id]: false }}
                         onmouseleave={() => apiDragDisabled = { ...apiDragDisabled, [group.id]: true }}
@@ -456,6 +507,54 @@
                       <span class="flex-1 min-w-0">
                         {api.name}
                       </span>
+                      <div
+                        onclick={(e) => e.stopPropagation()}
+                        onkeydown={(e) => e.stopPropagation()}
+                        role="none"
+                      >
+                        <DropdownMenu>
+                          {#snippet trigger()}
+                            <button
+                              class="h-6 w-6 flex items-center justify-center hover:bg-accent rounded-sm"
+                            >
+                              <MoreVertical class="h-4 w-4" />
+                            </button>
+                          {/snippet}
+
+                          {#snippet content()}
+                          <button
+                            class="flex w-full items-center px-2 py-1.5 text-sm hover:bg-accent rounded-sm"
+                            onclick={(e) => {
+                              e.stopPropagation()
+                              handleApiShare(api.id)
+                            }}
+                          >
+                            <Share2 class="mr-2 h-4 w-4" />
+                            {$_('docViewer.share')}
+                          </button>
+                          <button
+                            class="flex w-full items-center px-2 py-1.5 text-sm hover:bg-accent rounded-sm"
+                            onclick={(e) => {
+                              e.stopPropagation()
+                              handleApiDuplicate(api.id)
+                            }}
+                          >
+                            <Copy class="mr-2 h-4 w-4" />
+                            {$_('api.duplicate')}
+                          </button>
+                          <button
+                            class="flex w-full items-center px-2 py-1.5 text-sm text-destructive hover:bg-accent rounded-sm"
+                            onclick={(e) => {
+                              e.stopPropagation()
+                              openDeleteApiDialog(api.id, api.name)
+                            }}
+                          >
+                            <Trash2 class="mr-2 h-4 w-4" />
+                            {$_('common.delete')}
+                          </button>
+                          {/snippet}
+                        </DropdownMenu>
+                      </div>
                     </div>
                   {/each}
                 </div>
@@ -484,4 +583,30 @@
     bind:open={deleteDialogOpen}
     onSuccess={onDataChange}
   />
+{/if}
+
+{#if selectedApiForDelete}
+  <AlertDialog bind:open={deleteApiDialogOpen}>
+    <div class="space-y-4">
+      <div class="space-y-2">
+        <h2 class="text-lg font-semibold">{$_('api.deleteTitle')}</h2>
+        <p class="text-sm text-muted-foreground">
+          {$_('api.deleteDescription', { values: { name: selectedApiForDelete.name } })}
+          <br />
+          <strong class="text-destructive">{$_('api.deleteWarning')}</strong>
+        </p>
+      </div>
+      <div class="flex gap-2 justify-end">
+        <Button variant="outline" onclick={() => deleteApiDialogOpen = false}>
+          {$_('common.cancel')}
+        </Button>
+        <Button
+          variant="destructive"
+          onclick={handleDeleteApi}
+        >
+          {$_('common.delete')}
+        </Button>
+      </div>
+    </div>
+  </AlertDialog>
 {/if}

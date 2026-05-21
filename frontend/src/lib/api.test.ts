@@ -9,6 +9,7 @@ import {
 	createApi,
 	updateApi,
 	deleteApi,
+	duplicateApi,
 	updateApiOrders,
 	updateGroupOrders,
 	updateApiParametersFromJson,
@@ -554,6 +555,81 @@ describe('API Client - APIs', () => {
 			const result = await deleteApi(999)
 
 			expect(result.success).toBe(false)
+		})
+	})
+
+	describe('duplicateApi', () => {
+		it('should duplicate an API successfully', async () => {
+			const mockDuplicatedApi: Api = {
+				id: 2,
+				groupId: 1,
+				name: 'Login - copy',
+				method: 'POST',
+				endpoint: '/api/login',
+				type: 'REST',
+				note: null,
+				order: 2,
+				createdAt: '2024-01-01T00:00:00Z',
+				updatedAt: '2024-01-01T00:00:00Z'
+			}
+
+			mockFetch.mockResolvedValueOnce({
+				ok: true,
+				json: async () => ({ success: true, data: mockDuplicatedApi })
+			} as Response)
+
+			const result = await duplicateApi(1)
+
+			expect(mockFetch).toHaveBeenCalledWith('/api/apis/1/duplicate', {
+				method: 'POST'
+			})
+			expect(result).toEqual({
+				success: true,
+				data: mockDuplicatedApi
+			})
+		})
+
+		it('should handle duplicate with HTTP error', async () => {
+			mockFetch.mockResolvedValueOnce({
+				ok: false,
+				status: 404,
+				statusText: 'Not Found',
+				json: async () => ({})
+			} as Response)
+
+			const result = await duplicateApi(999)
+
+			expect(result).toEqual({
+				success: false,
+				error: 'HTTP Error: 404 Not Found'
+			})
+		})
+
+		it('should handle duplicate with network error', async () => {
+			mockFetch.mockRejectedValueOnce(new Error('Network error'))
+
+			const result = await duplicateApi(1)
+
+			expect(result).toEqual({
+				success: false,
+				error: 'Error: Network error'
+			})
+		})
+
+		it('should handle duplicate with invalid JSON response', async () => {
+			mockFetch.mockResolvedValueOnce({
+				ok: true,
+				json: async () => {
+					throw new Error('Invalid JSON')
+				}
+			} as Response)
+
+			const result = await duplicateApi(1)
+
+			expect(result).toEqual({
+				success: false,
+				error: 'Failed to parse response'
+			})
 		})
 	})
 

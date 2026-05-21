@@ -97,6 +97,7 @@ func main() {
 	apis.Patch("/:id", handlers.UpdateAPI(db))
 	apis.Patch("/:id/note", handlers.UpdateAPINote(db))
 	apis.Post("/orders", handlers.UpdateAPIOrders(db))
+	apis.Post("/:id/duplicate", handlers.DuplicateAPI(db))
 	apis.Delete("/:id", handlers.DeleteAPI(db))
 	apis.Put("/:id/parameters", handlers.UpdateParameters(db))
 	apis.Post("/:id/parameters/from-json", handlers.UpdateParametersFromJSON(db))

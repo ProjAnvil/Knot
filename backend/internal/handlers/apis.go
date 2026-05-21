@@ -224,6 +224,111 @@ func UpdateAPIOrders(db *gorm.DB) fiber.Handler {
 	}
 }
 
+// DuplicateAPI duplicates an API with all its parameters within the same group
+func DuplicateAPI(db *gorm.DB) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		id, err := strconv.ParseUint(c.Params("id"), 10, 32)
+		if err != nil {
+			return response.BadRequest(c, "Invalid API ID")
+		}
+
+		// Fetch source API with all parameters
+		var sourceAPI models.API
+		if err := db.Preload("Parameters", func(db *gorm.DB) *gorm.DB {
+			return db.Order("`order` ASC")
+		}).First(&sourceAPI, id).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				return response.NotFound(c, "API not found")
+			}
+			return response.InternalError(c, "Failed to fetch API")
+		}
+
+		// Get max order for the group
+		var maxOrder int
+		db.Model(&models.API{}).Where("group_id = ?", sourceAPI.GroupID).Select("COALESCE(MAX(`order`), 0)").Scan(&maxOrder)
+
+		// Build new name
+		newName := sourceAPI.Name + " - copy"
+
+		// Duplicate API and parameters in a transaction
+		err = db.Transaction(func(tx *gorm.DB) error {
+			newAPI := models.API{
+				GroupID:  sourceAPI.GroupID,
+				Name:     newName,
+				Endpoint: sourceAPI.Endpoint,
+				Method:   sourceAPI.Method,
+				Type:     sourceAPI.Type,
+				Note:     sourceAPI.Note,
+				Order:    maxOrder + 1,
+			}
+
+			if err := tx.Create(&newAPI).Error; err != nil {
+				return err
+			}
+
+			// Build a map from old parameter ID to new parameter ID for nesting
+			oldToNew := make(map[uint]uint)
+
+			// First pass: create top-level parameters (ParentID == nil)
+			for _, p := range sourceAPI.Parameters {
+				if p.ParentID == nil {
+					newParam := models.Parameter{
+						APIID:      newAPI.ID,
+						ParentID:   nil,
+						Name:       p.Name,
+						Type:       p.Type,
+						Description: p.Description,
+						Required:   p.Required,
+						ParamType:  p.ParamType,
+						Order:      p.Order,
+					}
+					if err := tx.Create(&newParam).Error; err != nil {
+						return err
+					}
+					oldToNew[p.ID] = newParam.ID
+				}
+			}
+
+			// Second pass: create child parameters (ParentID != nil)
+			for _, p := range sourceAPI.Parameters {
+				if p.ParentID != nil {
+					newParentID := oldToNew[*p.ParentID]
+					newParam := models.Parameter{
+						APIID:      newAPI.ID,
+						ParentID:   &newParentID,
+						Name:       p.Name,
+						Type:       p.Type,
+						Description: p.Description,
+						Required:   p.Required,
+						ParamType:  p.ParamType,
+						Order:      p.Order,
+					}
+					if err := tx.Create(&newParam).Error; err != nil {
+						return err
+					}
+					oldToNew[p.ID] = newParam.ID
+				}
+			}
+
+			return nil
+		})
+
+		if err != nil {
+			return response.InternalError(c, "Failed to duplicate API")
+		}
+
+		// Reload the new API to return
+		var newAPI models.API
+		if err := db.Preload("Parameters", func(db *gorm.DB) *gorm.DB {
+			return db.Order("`order` ASC")
+		}).Where("group_id = ? AND name = ?", sourceAPI.GroupID, newName).Last(&newAPI).Error; err != nil {
+			return response.InternalError(c, "Failed to fetch duplicated API")
+		}
+
+		return response.Success(c, newAPI)
+	}
+}
+
 // DeleteAPI deletes an API and all its parameters
 func DeleteAPI(db *gorm.DB) fiber.Handler {
 	return func(c *fiber.Ctx) error {

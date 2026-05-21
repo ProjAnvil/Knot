@@ -23,8 +23,8 @@
     }
   })
 
-  async function loadGroups() {
-    loading = true
+  async function loadGroups(silent = false) {
+    if (!silent) loading = true
     try {
       const result = await getGroupsWithApis()
       if (result.success && result.data) {
@@ -33,7 +33,7 @@
     } catch (error) {
       console.error('Failed to load groups:', error)
     } finally {
-      loading = false
+      if (!silent) loading = false
     }
   }
 
@@ -87,7 +87,7 @@
   
   function handleStructuralChange() {
     // For structural changes (create, delete, move), reload everything
-    loadGroups()
+    loadGroups(true)
     if (selectedApiId) {
       loadApiData(selectedApiId, false)
     }
