@@ -75,6 +75,7 @@ func runServer() {
 	groups.Get("/", handlers.GetGroups(db))
 	groups.Get("/with-apis", handlers.GetGroupsWithAPIs(db))
 	groups.Post("/", handlers.CreateGroup(db))
+	groups.Post("/orders", handlers.UpdateGroupOrders(db))
 	groups.Patch("/:id", handlers.UpdateGroup(db))
 	groups.Delete("/:id", handlers.DeleteGroup(db))
 
@@ -86,6 +87,7 @@ func runServer() {
 	apis.Patch("/:id", handlers.UpdateAPI(db))
 	apis.Patch("/:id/note", handlers.UpdateAPINote(db))
 	apis.Post("/orders", handlers.UpdateAPIOrders(db))
+	apis.Post("/:id/duplicate", handlers.DuplicateAPI(db))
 	apis.Delete("/:id", handlers.DeleteAPI(db))
 	apis.Put("/:id/parameters", handlers.UpdateParameters(db))
 	apis.Post("/:id/parameters/from-json", handlers.UpdateParametersFromJSON(db))
