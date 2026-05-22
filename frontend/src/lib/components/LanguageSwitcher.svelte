@@ -1,6 +1,7 @@
 <script lang="ts">
-  import { Globe } from 'lucide-svelte'
+  import { Globe } from '@lucide/svelte'
   import { locale } from 'svelte-i18n'
+  import { setCookie } from '$lib/cookie'
   import Button from './ui/button.svelte'
 
   let isPending = $state(false)
@@ -13,8 +14,8 @@
     // Set the locale directly
     locale.set(newLocale)
 
-    // Also set cookie for persistence
-    document.cookie = `locale=${newLocale}; path=/; max-age=31536000`
+    // Also set cookie for persistence (secure)
+    setCookie('locale', newLocale, 365)
   }
 </script>
 

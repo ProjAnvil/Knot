@@ -1,10 +1,11 @@
 <script lang="ts">
   import { _ } from 'svelte-i18n'
   import { toast } from 'svelte-sonner'
-  import { Check, Pencil, X } from 'lucide-svelte'
+  import { Check, Pencil, X } from '@lucide/svelte'
   import Button from '../ui/button.svelte'
   import Input from '../ui/input.svelte'
   import { updateApi } from '$lib/api'
+  import { onDestroy } from 'svelte'
 
   let {
     apiId,
@@ -21,15 +22,22 @@
   let isEditing = $state(false)
   let value = $state(endpoint)
   let isSaving = $state(false)
+  let blurTimeoutId: ReturnType<typeof setTimeout> | null = null
 
   // Sync value with endpoint prop when it changes (e.g., when switching APIs)
   $effect(() => {
     value = endpoint
   })
 
+  onDestroy(() => {
+    if (blurTimeoutId !== null) {
+      clearTimeout(blurTimeoutId)
+    }
+  })
+
   async function handleSave() {
     if (!value.trim()) {
-      toast.error($_('api.endpointRequired') || 'Endpoint is required')
+      toast.error($_('api.endpointRequired'))
       return
     }
 
@@ -67,10 +75,11 @@
 
   function handleBlur() {
     // Delay to allow button clicks to process first
-    setTimeout(() => {
+    blurTimeoutId = setTimeout(() => {
       if (isEditing && !isSaving) {
         handleCancel()
       }
+      blurTimeoutId = null
     }, 200)
   }
 </script>
@@ -110,7 +119,7 @@
     onclick={() => isEditing = true}
     role="button"
     tabindex="0"
-    onkeypress={(e) => e.key === 'Enter' && (isEditing = true)}
+    onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (isEditing = true)}
   >
     <code class="text-lg font-mono bg-muted px-4 py-2 rounded-md border">
       {endpoint}

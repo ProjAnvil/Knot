@@ -12,6 +12,7 @@
   let {
     apiData,
     onDataChange,
+    onStructuralChange,
   }: {
     apiData: ApiData
     onDataChange?: () => void
@@ -22,7 +23,7 @@
    * Generate example JSON from parameters with nested support
    * Handles primitives, objects, and arrays with proper nesting
    */
-  function generateExampleJson(parameters: ParameterWithChildren[]): Record<string, unknown> | unknown[] {
+  function generateExampleJson(parameters: ParameterWithChildren[]): Record<string, unknown> {
     const result: Record<string, unknown> = {}
 
     parameters.forEach((param) => {

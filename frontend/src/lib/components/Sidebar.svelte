@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ChevronDown, ChevronRight, GripVertical, MoreVertical, Pencil, Trash2, Search, X, ArrowUp, ArrowDown, Copy, Share2 } from 'lucide-svelte'
+  import { ChevronDown, ChevronRight, GripVertical, MoreVertical, Pencil, Trash2, Search, X, ArrowUp, ArrowDown, Copy, Share2 } from '@lucide/svelte'
   import { dndzone } from 'svelte-dnd-action'
   import { toast } from 'svelte-sonner'
   import { _ } from 'svelte-i18n'
@@ -210,7 +210,7 @@
 
       const result = await updateApiOrders(apiOrders)
       if (!result.success) {
-        toast.error(result.error || 'Failed to update API order')
+        toast.error(result.error || $_('api.orderUpdateError'))
         localGroups = [...groups]
       } else {
         onDataChange?.()
@@ -244,7 +244,7 @@
 
     const result = await updateGroupOrders(groupOrders)
     if (!result.success) {
-      toast.error(result.error || 'Failed to update group order')
+      toast.error(result.error || $_('group.orderUpdateError'))
       localGroups = [...groups]
     } else {
       onDataChange?.()
@@ -252,7 +252,7 @@
   }
 
   function closeOpenDropdown() {
-    document.querySelector('.fixed.inset-0.z-40')?.click()
+    (document.querySelector('.fixed.inset-0.z-40') as HTMLElement | null)?.click()
   }
 
   async function handleApiDuplicate(apiId: number) {

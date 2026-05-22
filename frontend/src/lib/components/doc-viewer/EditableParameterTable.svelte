@@ -1,7 +1,7 @@
 <script lang="ts">
   import { _ } from 'svelte-i18n'
   import { toast } from 'svelte-sonner'
-  import { Edit2, FileInput, FileOutput, Plus, Save, Trash2 } from 'lucide-svelte'
+  import { Edit2, FileInput, FileOutput, Plus, Save, Trash2 } from '@lucide/svelte'
   import Button from '../ui/button.svelte'
   import Badge from '../ui/badge.svelte'
   import Input from '../ui/input.svelte'
@@ -38,7 +38,7 @@
   function flattenParameters(params: ParameterWithChildren[], depth = 0): FlatParam[] {
     const result: FlatParam[] = []
     params.forEach((param) => {
-      const tempId = `param_${param.id || Math.random().toString(36).substr(2, 9)}`
+      const tempId = `param_${param.id || Math.random().toString(36).substring(2, 11)}`
       result.push({ ...param, depth, tempId })
       if (param.children && param.children.length > 0) {
         result.push(...flattenParameters(param.children, depth + 1))
@@ -53,9 +53,8 @@
     const stack: Array<{ param: ParameterWithChildren; depth: number }> = []
 
     flatParams.forEach((item) => {
-      const param: ParameterWithChildren = { ...item }
-      delete (param as any).depth
-      delete (param as any).tempId
+      const { depth: _depth, tempId: _tempId, ...rest } = item
+      const param: ParameterWithChildren = { ...rest }
       param.children = []
 
       // Pop stack until we find the parent
@@ -109,25 +108,24 @@
     }
   }
 
-  function updateParam(tempId: string, field: keyof ParameterWithChildren, value: any) {
+  function updateParam(tempId: string, field: keyof ParameterWithChildren, value: string | boolean | null) {
     editParams = editParams.map((p) => (p.tempId === tempId ? { ...p, [field]: value } : p))
   }
 
   function addParam(afterTempId?: string) {
     const newParam: FlatParam = {
-      id: undefined as any,
+      id: 0,
       name: '',
       type: 'string',
       description: null,
       required: false,
       depth: 0,
-      tempId: `new_${Math.random().toString(36).substr(2, 9)}`,
+      tempId: `new_${Math.random().toString(36).substring(2, 11)}`,
       apiId: parameters[0]?.apiId || 0,
       paramType: parameters[0]?.paramType || 'request',
       order: 0,
       parentId: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      children: [],
     }
 
     if (afterTempId) {
@@ -243,7 +241,7 @@
                   <td class="px-4 py-2">
                     <Input
                       value={param.name}
-                      oninput={(e) => updateParam(param.tempId, 'name', e.currentTarget.value)}
+                      oninput={(e: Event & { currentTarget: HTMLInputElement }) => updateParam(param.tempId, 'name', e.currentTarget.value)}
                       placeholder={$_('parameters.name')}
                       class="h-8"
                       style="padding-left: {param.depth * 20 + 8}px"
@@ -272,7 +270,7 @@
                   <td class="px-4 py-2">
                     <Textarea
                       value={param.description || ''}
-                      oninput={(e) => updateParam(param.tempId, 'description', e.currentTarget.value || null)}
+                      oninput={(e: Event & { currentTarget: HTMLTextAreaElement }) => updateParam(param.tempId, 'description', e.currentTarget.value || null)}
                       placeholder={$_('parameters.description')}
                       class="h-8 min-h-8 resize-none"
                       rows={1}

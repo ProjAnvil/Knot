@@ -158,7 +158,7 @@
         <DocViewer apiData={selectedApi} onDataChange={handleDataChange} onStructuralChange={handleStructuralChange} />
       {:else}
         <div class="flex h-full items-center justify-center text-muted-foreground">
-          Select an API to view details
+          {$_('common.selectApiPrompt')}
         </div>
       {/if}
     </main>
