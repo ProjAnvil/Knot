@@ -1,10 +1,11 @@
 <script lang="ts">
   import { _ } from 'svelte-i18n'
   import { toast } from 'svelte-sonner'
-  import { Pencil, Save, StickyNote, X, Code, Eye } from 'lucide-svelte'
+  import { Pencil, Save, StickyNote, X, Code, Eye } from '@lucide/svelte'
   import Button from '../ui/button.svelte'
   import Textarea from '../ui/textarea.svelte'
   import { updateApi } from '$lib/api'
+  import { sanitizeHtml } from '$lib/sanitize'
   import { marked } from 'marked'
   import { gfmHeadingId } from 'marked-gfm-heading-id'
 
@@ -37,7 +38,7 @@
     breaks: true,
   })
 
-  const renderedMarkdown = $derived(note ? marked.parse(note) as string : '')
+  const renderedMarkdown = $derived(note ? sanitizeHtml(marked.parse(note) as string) : '')
 
   async function handleSave() {
     isSaving = true

@@ -1,10 +1,11 @@
 <script lang="ts">
   import { _ } from 'svelte-i18n'
   import { toast } from 'svelte-sonner'
-  import { Check, Pencil, X } from 'lucide-svelte'
+  import { Check, Pencil, X } from '@lucide/svelte'
   import Button from '../ui/button.svelte'
   import Input from '../ui/input.svelte'
   import { updateApi } from '$lib/api'
+  import { onDestroy } from 'svelte'
 
   let {
     apiId,
@@ -21,10 +22,17 @@
   let isEditing = $state(false)
   let name = $state(apiName)
   let isSaving = $state(false)
+  let blurTimeoutId: ReturnType<typeof setTimeout> | null = null
 
   // Sync name with apiName prop when it changes (e.g., when switching APIs)
   $effect(() => {
     name = apiName
+  })
+
+  onDestroy(() => {
+    if (blurTimeoutId !== null) {
+      clearTimeout(blurTimeoutId)
+    }
   })
 
   async function handleSave() {
@@ -67,10 +75,11 @@
 
   function handleBlur() {
     // Delay to allow button clicks to process first
-    setTimeout(() => {
+    blurTimeoutId = setTimeout(() => {
       if (isEditing && !isSaving) {
         handleCancel()
       }
+      blurTimeoutId = null
     }, 200)
   }
 </script>
@@ -110,7 +119,7 @@
     onclick={() => isEditing = true}
     role="button"
     tabindex="0"
-    onkeypress={(e) => e.key === 'Enter' && (isEditing = true)}
+    onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (isEditing = true)}
   >
     <h1 class="text-3xl font-bold">{apiName}</h1>
     <Pencil class="h-5 w-5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />

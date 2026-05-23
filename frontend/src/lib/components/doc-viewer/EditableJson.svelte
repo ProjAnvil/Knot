@@ -1,7 +1,7 @@
 <script lang="ts">
   import { _ } from 'svelte-i18n'
   import { toast } from 'svelte-sonner'
-  import { AlertCircle, Check, Code2, Edit2, Save, X } from 'lucide-svelte'
+  import { AlertCircle, Check, Code2, Edit2, Save, X } from '@lucide/svelte'
   import Button from '../ui/button.svelte'
   import Textarea from '../ui/textarea.svelte'
 
@@ -74,7 +74,7 @@
   function handleChange(value: string) {
     editValue = value
     const validation = validateJson(value)
-    validationError = validation.valid ? null : validation.error || 'Invalid JSON'
+    validationError = validation.valid ? null : validation.error || $_('json.invalid')
   }
 
   // Render JSON with syntax highlighting
@@ -176,7 +176,7 @@
       {:else}
         <div class="flex items-center gap-2 text-sm text-green-600">
           <Check class="h-4 w-4" />
-          <span>Valid JSON</span>
+          <span>{$_('json.valid')}</span>
         </div>
       {/if}
     </div>

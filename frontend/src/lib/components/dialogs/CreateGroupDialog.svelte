@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Plus } from 'lucide-svelte'
+  import { Plus } from '@lucide/svelte'
   import { toast } from 'svelte-sonner'
   import { _ } from 'svelte-i18n'
   import Button from '../ui/button.svelte'

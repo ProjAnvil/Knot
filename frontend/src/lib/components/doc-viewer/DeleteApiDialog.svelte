@@ -1,7 +1,7 @@
 <script lang="ts">
   import { _ } from 'svelte-i18n'
   import { toast } from 'svelte-sonner'
-  import { Trash2 } from 'lucide-svelte'
+  import { Trash2 } from '@lucide/svelte'
   import Button from '../ui/button.svelte'
   import AlertDialog from '../ui/alert-dialog.svelte'
   import { deleteApi } from '$lib/api'

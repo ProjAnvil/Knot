@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ChevronDown, ChevronRight, Download, FileDown } from 'lucide-svelte'
+  import { ChevronDown, ChevronRight, Download, FileDown } from '@lucide/svelte'
   import { toast } from 'svelte-sonner'
   import { _ } from 'svelte-i18n'
   import Button from '../ui/button.svelte'

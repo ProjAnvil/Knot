@@ -7,6 +7,7 @@
 		"deleting": "Deleting...",
 		"add": "Add",
 		"create": "Create",
+		"creating": "Creating...",
 		"update": "Update",
 		"search": "Search",
 		"loading": "Loading...",
@@ -15,7 +16,8 @@
 		"optional": "Optional",
 		"name": "Name",
 		"type": "Type",
-		"description": "Description"
+		"description": "Description",
+		"selectApiPrompt": "Select an API to view details"
 	},
 	"sidebar": {
 		"title": "API Documentation",
@@ -39,7 +41,8 @@
 		"deleteDescription": "Are you sure you want to delete the group '{name}' and all {count} APIs in it?",
 		"deleteWarning": "This action cannot be undone.",
 		"deleteSuccess": "Group deleted successfully",
-		"deleteError": "Failed to delete group"
+		"deleteError": "Failed to delete group",
+		"orderUpdateError": "Failed to update group order"
 	},
 	"api": {
 		"create": "Create API",
@@ -69,7 +72,8 @@
 		"notePlaceholder": "Add notes here... Supports Markdown syntax.",
 		"noteSaved": "Note saved successfully",
 		"noteSaveFailed": "Failed to save note",
-		"preview": "Preview"
+		"preview": "Preview",
+		"orderUpdateError": "Failed to update API order"
 	},
 	"docViewer": {
 		"share": "Share",
@@ -100,6 +104,7 @@
 		"requestExample": "Request JSON Example",
 		"responseExample": "Response JSON Example",
 		"invalid": "Invalid JSON format",
+		"valid": "Valid JSON",
 		"updateSuccess": "JSON updated successfully",
 		"updateError": "Failed to update JSON"
 	},
@@ -133,5 +138,30 @@
 		"exportHtml": "Export HTML",
 		"success": "Export successful",
 		"error": "Export failed"
+	},
+	"createApi": {
+		"title": "Create New API",
+		"apiNameLabel": "API Name*",
+		"apiNamePlaceholder": "e.g. Get Balance",
+		"endpointLabel": "Endpoint*",
+		"endpointPlaceholder": "e.g. /api/v1/resource",
+		"typeLabel": "Type",
+		"methodLabel": "Method",
+		"requestParams": "Request Parameters",
+		"responseParams": "Response Parameters",
+		"addParameter": "Add Parameter",
+		"noRequestParams": "No request parameters. Click \"Add Parameter\" to add one.",
+		"noResponseParams": "No response parameters. Click \"Add Parameter\" to add one.",
+		"paramNamePlaceholder": "Parameter name",
+		"paramDescPlaceholder": "Description (optional)",
+		"nameRequired": "API name is required",
+		"groupRequired": "Please select a group",
+		"paramNamesRequired": "All parameter names must be filled in",
+		"createError": "Failed to create API",
+		"newApi": "New API",
+		"columnName": "Name",
+		"columnType": "Type",
+		"columnDescription": "Description",
+		"columnRequired": "Required"
 	}
 }
