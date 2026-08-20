@@ -1,0 +1,26 @@
+# Shared app service definition. Not meant to be used directly;
+# extend it from docker-compose.pg.yml or docker-compose.mysql.yml.
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: knot-app:latest
+    environment:
+      HOST: 0.0.0.0
+      # SQLite standalone mode: remove the KNOT_* variables in the extending
+      # file and the app falls back to SQLite persisted in the knot-data volume.
+    volumes:
+      - knot-data:/home/knot/.knot
+    healthcheck:
+      # Use 127.0.0.1 (not localhost): the server binds IPv4-only, while
+      # Alpine's busybox wget tries ::1 first for "localhost" and fails.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/api/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  knot-data:

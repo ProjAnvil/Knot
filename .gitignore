@@ -3,6 +3,8 @@
 # dependencies
 **/node_modules
 **/bun.lock
+# frontend/bun.lock is tracked: the root Dockerfile requires it for reproducible builds
+!frontend/bun.lock
 **/.vscode
 /.pnp
 .pnp.*
@@ -25,6 +27,7 @@
 # misc
 .DS_Store
 *.pem
+.superpowers/
 
 # debug
 npm-debug.log*

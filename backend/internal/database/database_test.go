@@ -466,3 +466,40 @@ func contains(s, substr string) bool {
 	}
 	return false
 }
+
+// TestGivenExistingDatabase_whenInitDatabaseAgain_thenDataPreserved tests re-initialization path
+func TestGivenExistingDatabase_whenInitDatabaseAgain_thenDataPreserved(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "reinit_test.db")
+
+	cfg := &config.Config{
+		DatabaseType: "sqlite",
+		SQLitePath:   dbPath,
+	}
+
+	// First init: create tables and insert a row
+	db, err := InitDatabase(cfg)
+	if err != nil {
+		t.Fatalf("first InitDatabase failed: %v", err)
+	}
+	group := models.Group{Name: "preserved-group"}
+	if err := db.Create(&group).Error; err != nil {
+		t.Fatalf("failed to insert group: %v", err)
+	}
+	sqlDB, _ := db.DB()
+	sqlDB.Close()
+
+	// Second init on the same file: tables exist, must not fail or lose data
+	db2, err := InitDatabase(cfg)
+	if err != nil {
+		t.Fatalf("second InitDatabase failed: %v", err)
+	}
+	var count int64
+	if err := db2.Model(&models.Group{}).Where("name = ?", "preserved-group").Count(&count).Error; err != nil {
+		t.Fatalf("failed to count groups: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("expected 1 group after re-init, got %d", count)
+	}
+	sqlDB2, _ := db2.DB()
+	sqlDB2.Close()
+}

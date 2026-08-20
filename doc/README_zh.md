@@ -31,6 +31,20 @@ Knot 是一个全面的 API 文档管理平台，帮助团队组织、记录和�
 
 ## 快速开始
 
+### 使用 Docker 启动
+
+最快的方式 —— 一条命令启动完整服务（前端已嵌入镜像，自带 PostgreSQL），无需本地安装 Go/bun：
+
+```bash
+# PostgreSQL 栈，访问 http://localhost:3000
+docker compose -f docker-compose.pg.yml up -d
+
+# 或 MySQL 栈，访问 http://localhost:3001
+docker compose -f docker-compose.mysql.yml up -d
+```
+
+数据库账号密码默认为 `knot`/`knot`，可通过 `.env` 文件覆盖（`POSTGRES_USER`、`POSTGRES_PASSWORD`、`POSTGRES_DB`、`MYSQL_USER`、`MYSQL_PASSWORD`、`MYSQL_DATABASE`、`MYSQL_ROOT_PASSWORD`）。若只需 SQLite 单机容器，去掉 compose 文件中的 `KNOT_*` 环境变量即可，数据持久化在 `knot-data` 卷中。
+
 ### 安装
 
 下载适合您平台的最新版本：

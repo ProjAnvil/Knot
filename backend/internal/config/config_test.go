@@ -686,3 +686,67 @@ func TestGivenInvalidDirectory_whenEnsureUserDataDir_thenReturnError(t *testing.
 		t.Errorf("expected no error with valid temp dir, got %v", err)
 	}
 }
+
+// TestGivenEnvOverrides_whenLoadConfig_thenEnvValuesApplied tests KNOT_* env var overrides
+func TestGivenEnvOverrides_whenLoadConfig_thenEnvValuesApplied(t *testing.T) {
+	resetViper()
+
+	originalHome := os.Getenv("HOME")
+	defer func() {
+		os.Setenv("HOME", originalHome)
+		os.Unsetenv("KNOT_DATABASE_TYPE")
+		os.Unsetenv("KNOT_POSTGRES_URL")
+		os.Unsetenv("KNOT_SQLITE_PATH")
+	}()
+
+	tempDir := t.TempDir()
+	os.Setenv("HOME", tempDir)
+	os.Setenv("KNOT_DATABASE_TYPE", "postgres")
+	os.Setenv("KNOT_POSTGRES_URL", "postgres://u:p@db:5432/knot")
+	os.Setenv("KNOT_SQLITE_PATH", "/custom/knot.db")
+
+	cfg, err := LoadConfig()
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if cfg.DatabaseType != "postgres" {
+		t.Errorf("expected DatabaseType 'postgres', got '%s'", cfg.DatabaseType)
+	}
+	if cfg.PostgresURL != "postgres://u:p@db:5432/knot" {
+		t.Errorf("expected PostgresURL from env, got '%s'", cfg.PostgresURL)
+	}
+	if cfg.SQLitePath != "/custom/knot.db" {
+		t.Errorf("expected SQLitePath from env, got '%s'", cfg.SQLitePath)
+	}
+}
+
+// TestGivenNoEnvOverrides_whenLoadConfig_thenDefaultsUnchanged tests backward compatibility
+func TestGivenNoEnvOverrides_whenLoadConfig_thenDefaultsUnchanged(t *testing.T) {
+	resetViper()
+
+	// Defensively clear KNOT_* env vars so a developer machine that has them
+	// set does not break this test
+	for _, key := range []string{"KNOT_DATABASE_TYPE", "KNOT_SQLITE_PATH", "KNOT_POSTGRES_URL", "KNOT_MYSQL_URL"} {
+		t.Setenv(key, "")
+		os.Unsetenv(key)
+	}
+
+	originalHome := os.Getenv("HOME")
+	defer func() {
+		os.Setenv("HOME", originalHome)
+	}()
+
+	tempDir := t.TempDir()
+	os.Setenv("HOME", tempDir)
+
+	cfg, err := LoadConfig()
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if cfg.DatabaseType != "sqlite" {
+		t.Errorf("expected default DatabaseType 'sqlite', got '%s'", cfg.DatabaseType)
+	}
+	if cfg.PostgresURL != "" {
+		t.Errorf("expected empty PostgresURL, got '%s'", cfg.PostgresURL)
+	}
+}

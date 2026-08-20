@@ -59,8 +59,9 @@ func InitDatabase(cfg *config.Config) (*gorm.DB, error) {
 
 	// Check if tables exist before running migration
 	// This prevents migration issues with existing data
-	var tableExists bool
-	db.Raw("SELECT count(*) > 0 FROM sqlite_master WHERE type='table' AND name='groups'").Scan(&tableExists)
+	// Use Migrator.HasTable which works across SQLite/PostgreSQL/MySQL
+	migrator := db.Migrator()
+	tableExists := migrator.HasTable(&models.Group{})
 
 	if !tableExists {
 		// Tables don't exist, run full migration
@@ -70,7 +71,6 @@ func InitDatabase(cfg *config.Config) (*gorm.DB, error) {
 	} else {
 		// Tables exist, only sync new columns/indexes without altering existing structure
 		// Use Migrator to add missing columns only
-		migrator := db.Migrator()
 
 		// Ensure all tables exist
 		if !migrator.HasTable(&models.Group{}) {

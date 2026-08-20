@@ -116,6 +116,21 @@ func LoadConfig() (*Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
+	// Environment variable overrides (useful for container deployments).
+	// These take precedence over the config file and are not persisted.
+	if v := os.Getenv("KNOT_DATABASE_TYPE"); v != "" {
+		config.DatabaseType = v
+	}
+	if v := os.Getenv("KNOT_SQLITE_PATH"); v != "" {
+		config.SQLitePath = v
+	}
+	if v := os.Getenv("KNOT_POSTGRES_URL"); v != "" {
+		config.PostgresURL = v
+	}
+	if v := os.Getenv("KNOT_MYSQL_URL"); v != "" {
+		config.MySQLURL = v
+	}
+
 	return &config, nil
 }
 

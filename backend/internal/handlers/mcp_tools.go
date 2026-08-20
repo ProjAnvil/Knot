@@ -8,6 +8,7 @@ import (
 	"github.com/ProjAnvil/knot/backend/pkg/response"
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // HandleMCPTools handles all MCP tool calls
@@ -101,7 +102,7 @@ func handleListAPIsByGroup(c *fiber.Ctx, db *gorm.DB, args map[string]interface{
 
 	var groups []models.Group
 	if err := db.Where("name LIKE ?", "%"+groupName+"%").Preload("APIs", func(db *gorm.DB) *gorm.DB {
-		return db.Order("`order` ASC")
+		return db.Order(clause.OrderByColumn{Column: clause.Column{Name: "order"}})
 	}).Find(&groups).Error; err != nil {
 		return response.InternalError(c, "Failed to fetch groups")
 	}
@@ -142,7 +143,7 @@ func handleGetAPI(c *fiber.Ctx, db *gorm.DB, args map[string]interface{}) error 
 
 	var api models.API
 	if err := db.Preload("Group").Preload("Parameters", func(db *gorm.DB) *gorm.DB {
-		return db.Order("`order` ASC")
+		return db.Order(clause.OrderByColumn{Column: clause.Column{Name: "order"}})
 	}).First(&api, uint(apiID)).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return response.NotFound(c, "API not found")
@@ -229,7 +230,7 @@ func handleGetAPIJSONExample(c *fiber.Ctx, db *gorm.DB, args map[string]interfac
 
 	var api models.API
 	if err := db.Preload("Parameters", func(db *gorm.DB) *gorm.DB {
-		return db.Order("`order` ASC")
+		return db.Order(clause.OrderByColumn{Column: clause.Column{Name: "order"}})
 	}).First(&api, uint(apiID)).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return response.NotFound(c, "API not found")

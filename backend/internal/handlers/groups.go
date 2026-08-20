@@ -7,13 +7,16 @@ import (
 	"github.com/ProjAnvil/knot/backend/pkg/response"
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // GetGroups returns all groups
 func GetGroups(db *gorm.DB) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		var groups []models.Group
-		result := db.Order("`order` ASC").Find(&groups)
+		// Use clause.OrderByColumn so GORM quotes the reserved `order`
+		// column per dialect (backticks break on PostgreSQL).
+		result := db.Order(clause.OrderByColumn{Column: clause.Column{Name: "order"}}).Find(&groups)
 		if result.Error != nil {
 			return response.InternalError(c, "Failed to fetch groups")
 		}
@@ -32,8 +35,8 @@ func GetGroupsWithAPIs(db *gorm.DB) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		var groups []models.Group
 		result := db.Preload("APIs", func(db *gorm.DB) *gorm.DB {
-			return db.Order("`order` ASC")
-		}).Order("`order` ASC").Find(&groups)
+			return db.Order(clause.OrderByColumn{Column: clause.Column{Name: "order"}})
+		}).Order(clause.OrderByColumn{Column: clause.Column{Name: "order"}}).Find(&groups)
 
 		if result.Error != nil {
 			return response.InternalError(c, "Failed to fetch groups with APIs")
@@ -72,7 +75,7 @@ func CreateGroup(db *gorm.DB) fiber.Handler {
 
 		// Get max order
 		var maxOrder int
-		db.Model(&models.Group{}).Select("COALESCE(MAX(`order`), 0)").Scan(&maxOrder)
+		db.Model(&models.Group{}).Select("COALESCE(MAX(?), 0)", clause.Column{Name: "order"}).Scan(&maxOrder)
 
 		group := models.Group{
 			Name:  body.Name,

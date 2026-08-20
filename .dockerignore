@@ -1,0 +1,12 @@
+.git
+.github
+.vscode
+.claude
+docs
+doc
+mcp-server
+**/node_modules
+frontend/dist
+backend/bin
+backend/dist
+**/.DS_Store

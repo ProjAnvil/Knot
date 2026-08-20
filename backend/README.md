@@ -140,6 +140,19 @@ Configuration is stored in:
 }
 ```
 
+#### Environment variable overrides
+
+All database settings can be overridden at runtime via environment variables
+(useful for containers). These take precedence over `config.json` and are not
+persisted:
+
+| Variable | Config field |
+|---|---|
+| `KNOT_DATABASE_TYPE` | `databaseType` |
+| `KNOT_SQLITE_PATH` | `sqlitePath` |
+| `KNOT_POSTGRES_URL` | `postgresUrl` |
+| `KNOT_MYSQL_URL` | `mysqlUrl` |
+
 ## Usage
 
 ### Development Mode

@@ -6,6 +6,7 @@ import (
 	"github.com/ProjAnvil/knot/backend/pkg/response"
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // ExportAPIs exports selected APIs to HTML
@@ -55,7 +56,7 @@ func ExportAPIs(db *gorm.DB) fiber.Handler {
 		var apisWithParams []services.APIWithParams
 		for _, api := range apis {
 			var allParams []models.Parameter
-			if err := db.Where("api_id = ?", api.ID).Order("`order` ASC").Find(&allParams).Error; err != nil {
+			if err := db.Where("api_id = ?", api.ID).Order(clause.OrderByColumn{Column: clause.Column{Name: "order"}}).Find(&allParams).Error; err != nil {
 				return response.InternalError(c, "Failed to fetch parameters")
 			}
 

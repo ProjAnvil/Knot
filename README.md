@@ -31,6 +31,22 @@ Knot is a comprehensive API documentation platform that helps teams organize, do
 
 ## Quick Start
 
+### Docker
+
+The fastest way to get started — a single command brings up the full stack
+with PostgreSQL, no local Go/bun toolchain required:
+
+```bash
+# PostgreSQL stack on http://localhost:3000
+docker compose -f docker-compose.pg.yml up -d
+
+# or the MySQL stack on http://localhost:3001
+docker compose -f docker-compose.mysql.yml up -d
+```
+
+See [Docker Deployment](#docker-deployment) for credential overrides and
+SQLite standalone mode.
+
 ### Installation
 
 Download the latest release for your platform:
@@ -78,6 +94,27 @@ knot help
 ```
 
 The web interface will be available at [http://localhost:3000](http://localhost:3000)
+
+## Docker Deployment
+
+The frontend is embedded into the backend binary at image build time, so a
+single container serves the full stack. Two Compose stacks are provided —
+PostgreSQL and MySQL — sharing one image via a common base file:
+
+```bash
+# PostgreSQL stack on http://localhost:3000
+docker compose -f docker-compose.pg.yml up -d --build
+
+# MySQL stack on http://localhost:3001
+docker compose -f docker-compose.mysql.yml up -d --build
+```
+
+Database credentials default to `knot`/`knot` and can be overridden through a
+`.env` file (`POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`,
+`MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_DATABASE`, `MYSQL_ROOT_PASSWORD`).
+
+For a standalone SQLite container, remove the `KNOT_*` environment variables
+from the compose file; data persists in the `knot-data` volume.
 
 ## Documentation
 
@@ -376,7 +413,7 @@ We welcome contributions! Here's how you can help:
 - [ ] Team collaboration features
 - [ ] API testing interface
 - [ ] GraphQL support
-- [ ] Docker deployment
+- [x] Docker deployment
 - [ ] Cloud hosting option
 - [ ] Plugin system
 

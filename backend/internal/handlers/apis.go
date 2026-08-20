@@ -9,6 +9,7 @@ import (
 	"github.com/ProjAnvil/knot/backend/pkg/response"
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // GetAPI returns a single API with parameters
@@ -22,7 +23,7 @@ func GetAPI(db *gorm.DB) fiber.Handler {
 		var api models.API
 		result := db.Preload("Group").
 			Preload("Parameters", func(db *gorm.DB) *gorm.DB {
-				return db.Order("`order` ASC")
+				return db.Order(clause.OrderByColumn{Column: clause.Column{Name: "order"}})
 			}).
 			First(&api, id)
 
@@ -48,9 +49,9 @@ func GetAPIsByGroup(db *gorm.DB) fiber.Handler {
 		var apis []models.API
 		result := db.Where("group_id = ?", groupID).
 			Preload("Parameters", func(db *gorm.DB) *gorm.DB {
-				return db.Order("`order` ASC")
+				return db.Order(clause.OrderByColumn{Column: clause.Column{Name: "order"}})
 			}).
-			Order("`order` ASC").
+			Order(clause.OrderByColumn{Column: clause.Column{Name: "order"}}).
 			Find(&apis)
 
 		if result.Error != nil {
@@ -87,7 +88,7 @@ func CreateAPI(db *gorm.DB) fiber.Handler {
 
 		// Get max order for this group
 		var maxOrder int
-		db.Model(&models.API{}).Where("group_id = ?", body.GroupID).Select("COALESCE(MAX(`order`), 0)").Scan(&maxOrder)
+		db.Model(&models.API{}).Where("group_id = ?", body.GroupID).Select("COALESCE(MAX(?), 0)", clause.Column{Name: "order"}).Scan(&maxOrder)
 
 		api := models.API{
 			GroupID:  body.GroupID,
@@ -235,7 +236,7 @@ func DuplicateAPI(db *gorm.DB) fiber.Handler {
 		// Fetch source API with all parameters
 		var sourceAPI models.API
 		if err := db.Preload("Parameters", func(db *gorm.DB) *gorm.DB {
-			return db.Order("`order` ASC")
+			return db.Order(clause.OrderByColumn{Column: clause.Column{Name: "order"}})
 		}).First(&sourceAPI, id).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
 				return response.NotFound(c, "API not found")
@@ -245,7 +246,7 @@ func DuplicateAPI(db *gorm.DB) fiber.Handler {
 
 		// Get max order for the group
 		var maxOrder int
-		db.Model(&models.API{}).Where("group_id = ?", sourceAPI.GroupID).Select("COALESCE(MAX(`order`), 0)").Scan(&maxOrder)
+		db.Model(&models.API{}).Where("group_id = ?", sourceAPI.GroupID).Select("COALESCE(MAX(?), 0)", clause.Column{Name: "order"}).Scan(&maxOrder)
 
 		// Build new name
 		newName := sourceAPI.Name + " - copy"
@@ -320,7 +321,7 @@ func DuplicateAPI(db *gorm.DB) fiber.Handler {
 		// Reload the new API to return
 		var newAPI models.API
 		if err := db.Preload("Parameters", func(db *gorm.DB) *gorm.DB {
-			return db.Order("`order` ASC")
+			return db.Order(clause.OrderByColumn{Column: clause.Column{Name: "order"}})
 		}).Where("group_id = ? AND name = ?", sourceAPI.GroupID, newName).Last(&newAPI).Error; err != nil {
 			return response.InternalError(c, "Failed to fetch duplicated API")
 		}

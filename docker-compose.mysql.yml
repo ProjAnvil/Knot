@@ -1,0 +1,36 @@
+name: knot-mysql
+
+services:
+  app:
+    extends:
+      file: docker-compose.base.yml
+      service: app
+    environment:
+      KNOT_DATABASE_TYPE: mysql
+      KNOT_MYSQL_URL: ${MYSQL_USER:-knot}:${MYSQL_PASSWORD:-knot}@tcp(mysql:3306)/${MYSQL_DATABASE:-knot}?charset=utf8mb4&parseTime=True
+    ports:
+      - "3001:3000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-knot}
+      MYSQL_USER: ${MYSQL_USER:-knot}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-knot}
+    volumes:
+      - mysqldata:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  knot-data:
+  mysqldata:
