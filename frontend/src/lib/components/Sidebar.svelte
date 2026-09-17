@@ -24,12 +24,14 @@
     selectedApiId,
     selectedGroupId,
     onApiSelect,
+    onApiPrefetch,
     onDataChange
   }: {
     groups: GroupWithApis[]
     selectedApiId?: number
     selectedGroupId?: number
     onApiSelect?: (apiId: number) => void
+    onApiPrefetch?: (apiId: number) => void
     onDataChange?: () => void
   } = $props()
 
@@ -483,6 +485,8 @@
                           selectApi(api.id)
                         }
                       }}
+                      onmouseenter={() => onApiPrefetch?.(api.id)}
+                      onfocusin={() => onApiPrefetch?.(api.id)}
                       role="button"
                       tabindex="0"
                       onkeydown={(e) => {

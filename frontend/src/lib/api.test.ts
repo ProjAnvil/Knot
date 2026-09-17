@@ -296,6 +296,26 @@ describe('API Client - APIs', () => {
 	})
 
 	describe('getApi', () => {
+		it('should forward an abort signal when one is provided', async () => {
+			mockFetch.mockResolvedValueOnce({
+				ok: true,
+				json: async () => ({ success: true, data: { id: 1, parameters: [] } })
+			} as unknown as Response)
+
+			const controller = new AbortController()
+			await getApi(1, controller.signal)
+
+			expect(mockFetch).toHaveBeenCalledWith('/api/apis/1', { signal: controller.signal })
+		})
+
+		it('should rethrow so an aborted request is not reported as a failure', async () => {
+			const abortError = new DOMException('The operation was aborted.', 'AbortError')
+			mockFetch.mockRejectedValueOnce(abortError)
+
+			const controller = new AbortController()
+			await expect(getApi(1, controller.signal)).rejects.toThrow('aborted')
+		})
+
 		it('should fetch API with hierarchical parameters', async () => {
 			const mockRawResponse: ApiRawResponse = {
 				id: 1,

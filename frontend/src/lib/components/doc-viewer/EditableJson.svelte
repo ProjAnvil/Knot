@@ -77,19 +77,38 @@
     validationError = validation.valid ? null : validation.error || $_('json.invalid')
   }
 
-  // Render JSON with syntax highlighting
-  function renderJsonWithHighlight(jsonString: string) {
-    const tokens: Array<{ type: string; value: string }> = []
+  function escapeHtml(value: string): string {
+    return value.replace(/[&<>"']/g, (ch) => {
+      switch (ch) {
+        case '&':
+          return '&amp;'
+        case '<':
+          return '&lt;'
+        case '>':
+          return '&gt;'
+        case '"':
+          return '&quot;'
+        default:
+          return '&#39;'
+      }
+    })
+  }
 
-    // Simple tokenizer
+  // Render JSON with syntax highlighting.
+  // Emitting one <span> per token used to create ~500 DOM nodes per editor and
+  // re-create them on every API switch, which dominated switch latency.
+  function renderJsonWithHighlight(jsonString: string): string {
     const regex = /"[^"]*"(?=\s*:)|"[^"]*"|true|false|null|-?\d+\.?\d*|[{}[\],]/g
+    let html = ''
     let lastIndex = 0
     let match: RegExpExecArray | null
 
+    const wrap = (cls: string, text: string) => `<span class="${cls}">${escapeHtml(text)}</span>`
+
     while ((match = regex.exec(jsonString)) !== null) {
-      // Add whitespace before token
+      // Preserve whitespace before the token
       if (match.index > lastIndex) {
-        tokens.push({ type: 'whitespace', value: jsonString.substring(lastIndex, match.index) })
+        html += escapeHtml(jsonString.substring(lastIndex, match.index))
       }
 
       const token = match[0]
@@ -97,22 +116,22 @@
       // Determine token type and color
       if (token.startsWith('"') && jsonString[regex.lastIndex] === ':') {
         // Object key
-        tokens.push({ type: 'key', value: token })
+        html += wrap('text-sky-600 dark:text-sky-400', token)
       } else if (token.startsWith('"')) {
         // String value
-        tokens.push({ type: 'string', value: token })
+        html += wrap('text-emerald-600 dark:text-emerald-400', token)
       } else if (token === 'true' || token === 'false') {
         // Boolean
-        tokens.push({ type: 'boolean', value: token })
+        html += wrap('text-violet-600 dark:text-violet-400', token)
       } else if (token === 'null') {
         // Null
-        tokens.push({ type: 'null', value: token })
+        html += wrap('text-slate-500 dark:text-slate-400', token)
       } else if (/^-?\d+\.?\d*$/.test(token)) {
         // Number
-        tokens.push({ type: 'number', value: token })
+        html += wrap('text-amber-600 dark:text-amber-400', token)
       } else {
         // Punctuation
-        tokens.push({ type: 'punctuation', value: token })
+        html += wrap('text-slate-600 dark:text-slate-400', token)
       }
 
       lastIndex = regex.lastIndex
@@ -120,13 +139,25 @@
 
     // Add remaining text
     if (lastIndex < jsonString.length) {
-      tokens.push({ type: 'whitespace', value: jsonString.substring(lastIndex) })
+      html += escapeHtml(jsonString.substring(lastIndex))
     }
 
-    return tokens
+    return html
   }
 
-  const highlightedTokens = $derived(renderJsonWithHighlight(JSON.stringify(json, null, 2)))
+  // Memoize on the serialized value so switching between APIs that produce the
+  // same example does not rebuild the markup or touch the DOM again.
+  let lastHighlightKey = ''
+  let lastHighlighted = ''
+  function highlight(jsonValue: Record<string, unknown>): string {
+    const jsonString = JSON.stringify(jsonValue, null, 2)
+    if (jsonString === lastHighlightKey) return lastHighlighted
+    lastHighlightKey = jsonString
+    lastHighlighted = renderJsonWithHighlight(jsonString)
+    return lastHighlighted
+  }
+
+  const highlightedHtml = $derived(highlight(json))
 </script>
 
 <div class="space-y-2">
@@ -182,7 +213,7 @@
     </div>
   {:else}
     <div class="relative rounded-md border bg-muted/50">
-      <pre class="overflow-x-auto p-4"><code class="relative rounded font-mono text-sm">{#each highlightedTokens as token}{#if token.type === 'key'}<span class="text-sky-600 dark:text-sky-400">{token.value}</span>{:else if token.type === 'string'}<span class="text-emerald-600 dark:text-emerald-400">{token.value}</span>{:else if token.type === 'boolean'}<span class="text-violet-600 dark:text-violet-400">{token.value}</span>{:else if token.type === 'null'}<span class="text-slate-500 dark:text-slate-400">{token.value}</span>{:else if token.type === 'number'}<span class="text-amber-600 dark:text-amber-400">{token.value}</span>{:else if token.type === 'punctuation'}<span class="text-slate-600 dark:text-slate-400">{token.value}</span>{:else}{token.value}{/if}{/each}</code></pre>
+      <pre class="overflow-x-auto p-4"><code class="relative rounded font-mono text-sm">{@html highlightedHtml}</code></pre>
     </div>
   {/if}
 </div>

@@ -99,9 +99,13 @@ function buildParameterTree(params: Parameter[]): ParameterWithChildren[] {
 }
 
 // APIs API
-export async function getApi(id: number): Promise<ApiResult<ApiData>> {
+export async function getApi(id: number, signal?: AbortSignal): Promise<ApiResult<ApiData>> {
 	try {
-		const response = await fetch(`${API_BASE}/apis/${id}`)
+		// Keep the single-argument form when no signal is passed so callers and
+		// tests that assert on the fetch call are unaffected.
+		const response = signal
+			? await fetch(`${API_BASE}/apis/${id}`, { signal })
+			: await fetch(`${API_BASE}/apis/${id}`)
 		const result = await handleResponse<ApiRawResponse>(response)
 
 		if (result.success && result.data) {
@@ -122,6 +126,11 @@ export async function getApi(id: number): Promise<ApiResult<ApiData>> {
 
 		return { success: false, error: result.error }
 	} catch (error) {
+		// Let callers distinguish an intentional cancellation from a real failure
+		// so a superseded request never surfaces as an error.
+		if (signal?.aborted || (error instanceof DOMException && error.name === 'AbortError')) {
+			throw error
+		}
 		return { success: false, error: String(error) }
 	}
 }
