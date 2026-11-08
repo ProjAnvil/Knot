@@ -36,6 +36,9 @@ func ServeEmbeddedFiles(embedFS fs.FS) fiber.Handler {
 				return c.Status(404).SendString("Not Found")
 			}
 			c.Set("Content-Type", "text/html; charset=utf-8")
+			if setRevalidatingCache(c, "index.html", indexData) {
+				return c.SendStatus(fiber.StatusNotModified)
+			}
 			return c.Send(indexData)
 		}
 
@@ -46,6 +49,14 @@ func ServeEmbeddedFiles(embedFS fs.FS) fiber.Handler {
 			contentType = "application/octet-stream"
 		}
 		c.Set("Content-Type", contentType)
+
+		// Hashed bundles never change under the same name: cache them forever.
+		// Everything else (index.html, vite.svg, ...) must be revalidated.
+		if !setImmutableAssetCache(c, filePath) {
+			if setRevalidatingCache(c, filePath, data) {
+				return c.SendStatus(fiber.StatusNotModified)
+			}
+		}
 
 		return c.Send(data)
 	}

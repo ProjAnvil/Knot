@@ -33,9 +33,16 @@ func ServeStaticFiles(distPath string) fiber.Handler {
 			// If file not found or is a directory, try index.html for SPA routing
 			indexPath := filepath.Join(distPath, "index.html")
 			if _, err := os.Stat(indexPath); err == nil {
+				c.Set(fiber.HeaderCacheControl, "no-cache")
 				return c.SendFile(indexPath)
 			}
 			return c.Status(404).SendString("Not Found")
+		}
+
+		// Hashed bundles are immutable; anything else must be revalidated.
+		// c.SendFile adds Last-Modified and answers If-Modified-Since with 304.
+		if !setImmutableAssetCache(c, path) {
+			c.Set(fiber.HeaderCacheControl, "no-cache")
 		}
 
 		// Serve the file

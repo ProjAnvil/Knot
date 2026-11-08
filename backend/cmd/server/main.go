@@ -12,6 +12,7 @@ import (
 	"github.com/ProjAnvil/knot/backend/internal/handlers"
 	"github.com/ProjAnvil/knot/backend/pkg/logger"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/compress"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 )
@@ -36,6 +37,10 @@ func main() {
 
 	app := fiber.New(fiber.Config{AppName: "Knot"})
 	app.Use(recover.New())
+	// Negotiate gzip/deflate/brotli. The API payloads are highly repetitive JSON
+	// (the sidebar list is ~84 KB uncompressed, ~14 KB gzipped), so compression
+	// is the single biggest win for clients on slow links.
+	app.Use(compress.New(compress.Config{Level: compress.LevelDefault}))
 	app.Use(cors.New())
 
 	// Health check with database status

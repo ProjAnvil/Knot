@@ -1,4 +1,11 @@
+<script module lang="ts">
+  // marked and its GFM plugin are only needed to preview a note, so they are
+  // loaded lazily to keep the initial bundle smaller.
+  let markedConfigured = false
+</script>
+
 <script lang="ts">
+  import { onMount } from 'svelte'
   import { _ } from 'svelte-i18n'
   import { toast } from 'svelte-sonner'
   import { Pencil, Save, StickyNote, X, Code, Eye } from '@lucide/svelte'
@@ -6,8 +13,6 @@
   import Textarea from '../ui/textarea.svelte'
   import { updateApi } from '$lib/api'
   import { sanitizeHtml } from '$lib/sanitize'
-  import { marked } from 'marked'
-  import { gfmHeadingId } from 'marked-gfm-heading-id'
 
   let {
     apiId,
@@ -19,10 +24,15 @@
     onDataChange?: () => void
   } = $props()
 
+  type MarkdownParser = { parse: (src: string) => string | Promise<string> }
+
   let isEditing = $state(false)
   let note = $state(initialNote || '')
   let isSaving = $state(false)
   let activeTab = $state<'edit' | 'preview'>('edit')
+  // Wrapped in an object so TypeScript keeps the declared union instead of
+  // narrowing the binding to `null` (the real value arrives in onMount).
+  let markdownState = $state<{ lib: MarkdownParser | null }>({ lib: null })
 
   // Update note when switching to a different API
   $effect(() => {
@@ -31,14 +41,29 @@
     activeTab = 'edit'
   })
 
-  // Configure marked for GitHub Flavored Markdown
-  marked.use(gfmHeadingId())
-  marked.setOptions({
-    gfm: true,
-    breaks: true,
+  onMount(async () => {
+    const [markedModule, gfmModule] = await Promise.all([
+      import('marked'),
+      import('marked-gfm-heading-id'),
+    ])
+
+    if (!markedConfigured) {
+      // Configure marked for GitHub Flavored Markdown (once per page load;
+      // marked keeps its options in module state).
+      markedModule.marked.use(gfmModule.gfmHeadingId())
+      markedModule.marked.setOptions({
+        gfm: true,
+        breaks: true,
+      })
+      markedConfigured = true
+    }
+
+    markdownState.lib = markedModule.marked
   })
 
-  const renderedMarkdown = $derived(note ? sanitizeHtml(marked.parse(note) as string) : '')
+  const renderedMarkdown = $derived(
+    note && markdownState.lib ? sanitizeHtml(markdownState.lib.parse(note) as string) : ''
+  )
 
   async function handleSave() {
     isSaving = true
