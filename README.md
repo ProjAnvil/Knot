@@ -138,6 +138,10 @@ from the compose file; data persists in the `knot-data` volume.
 - [MCP Usage Guide](./doc/MCP_USAGE_GUIDE.md)
 - [Development Guide](./CLAUDE.md)
 
+## Library
+
+Knot's data model is published as an importable Go module in [`models/`](./models/): the domain types (`Group`, `API`, `Parameter`), the Knot JSON v1 wire-format types, and validation constants, plus a JSON Schema and TypeScript declarations for non-Go consumers. The module is versioned independently via `models/v*` tags — see the [models README](./models/README.md) for install, semver, and artifact details.
+
 ## Configuration
 
 Knot stores its configuration at:
