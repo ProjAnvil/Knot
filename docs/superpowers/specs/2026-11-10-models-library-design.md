@@ -1,7 +1,7 @@
 # Knot Models Library — Design
 
 - Date: 2026-11-10
-- Status: Draft (pending builder check)
+- Status: Final (builder check applied — 8 corrections folded into §7/§9/§10/§11)
 - Target releases: `models/v1.0.0` (library) and `v0.7.0` (product)
 
 ## 1. Intent
@@ -140,8 +140,12 @@ tools/                           # separate module: generation tooling
   go.mod                         # deps: invopop/jsonschema, gzuidhof/tygo
   cmd/gen-schema/main.go         # writes models/schema/knot-v1.schema.json
   cmd/gen-ts/main.go             # writes models/ts/index.d.ts
-go.work                          # use (./backend ./models ./tools)
+go.work                          # use (./backend ./models ./tools ./mcp-server)
 ```
+
+`go.work` must `use` `./mcp-server` too: `release.yml` runs `make
+build-all` inside `mcp-server/`, and Go fails in a module that sits under
+an ancestor `go.work` that doesn't list it.
 
 Notes:
 
@@ -162,6 +166,24 @@ Notes:
 - `BuildParameterTree` (services, HTML-export-specific shape) stays in
   services; `TreeFromParams`/`ParamNodesFromJSONValue`/`CountNodes` move
   with `ParamNode` (pure, zero deps).
+- Test placement: the GORM-tag behavioral tests currently in
+  `group_test.go` (they import gorm + glebarez/sqlite) land in
+  `gormbind/` as `gormbind_test.go`; only stdlib-only marshal/type tests
+  move into the root package. This is what keeps the root `go.mod` at
+  zero requires.
+- Coverage attribution: functions in the separate `models` module are
+  invisible to `backend`'s profile without `-coverpkg`; the ≥85% gate
+  for moved code (pattern `param_node|wire|import_plan|api.go|group.go|
+  parameter.go|constants`) runs in the new `models` CI job with
+  `-coverpkg=./...` scoped to the module — `backend/Makefile` keeps its
+  existing pattern unchanged.
+- Round-trip golden tests (`BuildKnotDocument` ↔ `ParseKnotJSON`) call
+  backend functions and stay in backend as integration proof; the
+  library carries the type-level marshal tests.
+- `gormbind` supplies `MigrateModels()` (the model list, same order as
+  today) and `AutoMigrate(db)`; `backend/internal/database/database.go`
+  keeps its existing conditional HasTable/migrator logic and only sources
+  the model list from `gormbind` — no behavior change.
 
 ### 7.2 Backend refactor
 
@@ -226,26 +248,36 @@ Notes:
 ## 10. Release plan
 
 1. Branch `feat/models-library`; PR (English, conventional commits).
-2. CI green (existing 3 jobs + new `models` job: build, test, regenerate
-   drift check, consumption smoke).
-3. Squash-merge → push `models/v1.0.0` → verify external `go get` smoke.
-4. `gh release create models/v1.0.0` with short English notes (library
-   usage + artifact links).
-5. Push `v0.7.0` → existing `release.yml` builds binaries; `gh release
-   edit v0.7.0 --notes-file` with the English template (Highlights:
-   model library extraction, schema + TS artifacts, no product behavior
-   change). Full Changelog base bumps to `v0.6.0`.
+2. CI green (existing 3 jobs + new `models` job: build, test,
+   regenerate drift check, GOWORK=off consumption smoke).
+3. Squash-merge → push `models/v1.0.0` → verify external
+   `go get github.com/ProjAnvil/knot/models@v1.0.0` smoke outside the
+   repo.
+4. `gh release create models/v1.0.0 --latest=false` (must NOT steal the
+   product's Latest badge) with short English notes (library usage +
+   artifact links).
+5. Bootstrap go.sum for image builds (no workspace inside Docker):
+   `cd backend && GOWORK=off go mod tidy` against the now-published tag
+   → fixup commit on main → verify `GOWORK=off go build ./...` passes.
+6. Push `v0.7.0` **on the fixup commit** → existing `release.yml` builds
+   binaries; `gh release edit v0.7.0 --notes-file` with the English
+   template (Highlights: model library extraction, schema + TS
+   artifacts, no product behavior change). Full Changelog base bumps to
+   `v0.6.0`.
 
 ## 11. Risks & mitigations
 
 | Risk | Mitigation |
 |------|------------|
-| `go.work` surprises in Docker/CI builds (workspace leaking into release images) | Release workflow already builds inside `backend/`; verify `Dockerfile` build path; set `GOWORK=off` in Dockerfile if needed |
+| Docker image builds have NO workspace (Dockerfile copies only `backend/`), so `go.mod`+`go.sum` must resolve the published tag | §10.5 bootstrap: `GOWORK=off go mod tidy` fixup commit after `models/v1.0.0` exists; `v0.7.0` tags that commit; CI models job runs a `GOWORK=off` replace-drift check |
 | Tag ordering: `backend` tag build resolves `models v1.0.0` before it exists | Workspace satisfies it locally/in CI; product tag is pushed after `models/v1.0.0` exists |
+| `release.yml` builds `mcp-server/` under the new root `go.work` | `go.work` uses `./mcp-server` too (verified failure mode if omitted) |
 | Schema/TS generators drift silently | CI regeneration diff gate |
-| Moved tests lose coverage attribution | Gate pattern extended to `models/`; moved tests keep numbers |
+| Moved tests lose coverage attribution | `-coverpkg` in the models CI job gate |
 | tygo output churn across versions | `tools/go.mod` pins exact generator versions; regenerate = explicit commit |
+| Library release steals product's "Latest" badge | `gh release create models/v1.0.0 --latest=false` |
 | Double maintenance of `BuildParameterTree` vs `TreeFromParams` | Pre-existing duplication, unchanged scope; noted for future dedupe |
+| Root `LICENSE` has a "[Your Name]" MIT placeholder | Pre-existing repo state; out of scope here, flagged for the product owner |
 
 ## 12. Execution sequence
 
