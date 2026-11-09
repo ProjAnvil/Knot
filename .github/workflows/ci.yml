@@ -27,7 +27,10 @@ jobs:
         working-directory: backend
         run: make test-coverage
 
+      # Upload even when the coverage gate fails so the profile is
+      # available for debugging the failure.
       - name: Upload coverage profile
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: backend-coverage

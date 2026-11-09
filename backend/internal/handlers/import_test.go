@@ -303,3 +303,129 @@ func TestImportDocument(t *testing.T) {
 		assert.Equal(t, fiber.StatusRequestEntityTooLarge, resp.StatusCode)
 	})
 }
+
+// postmanImportFixture returns a minimal Postman v2.1 collection that
+// DetectImportFormat classifies as postman: one group, one GET API.
+func postmanImportFixture() []byte {
+	return []byte(`{
+		"info": {"name": "Collection", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},
+		"item": [{"name": "List users", "request": {"method": "GET", "url": "/users"}}]
+	}`)
+}
+
+// openAPIImportFixture returns a minimal OpenAPI 3.1 document that
+// DetectImportFormat classifies as openapi: one tagged operation.
+func openAPIImportFixture() []byte {
+	return []byte(`{
+		"openapi": "3.1.0",
+		"info": {"title": "API", "version": "1.0.0"},
+		"paths": {"/users": {"get": {"summary": "List users", "tags": ["Users"]}}}
+	}`)
+}
+
+// TestImportDocument_FormatDispatchAndErrors covers the remaining dispatch
+// and failure paths of the import handler: the postman and openapi parse
+// branches, a detectable file whose parse fails (400) and an apply failure
+// surfaced as 500.
+func TestImportDocument_FormatDispatchAndErrors(t *testing.T) {
+	t.Run("givenPostmanFile_whenImport_thenImportsCollection", func(t *testing.T) {
+		// Arrange
+		db := setupTestDB(t)
+		app := setupImportTestApp(db)
+
+		// Act - real import (no dryRun)
+		resp, err := app.Test(postImportRequest(t, postmanImportFixture(), ""))
+		require.NoError(t, err)
+
+		// Assert
+		assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+
+		var body struct {
+			Success bool               `json:"success"`
+			Data    importResponseData `json:"data"`
+		}
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+		assert.True(t, body.Success)
+		assert.Equal(t, "postman", body.Data.Format)
+		assert.Equal(t, 1, body.Data.GroupsCreated)
+		assert.Equal(t, 1, body.Data.APIsImported)
+
+		// Assert - the collection is persisted with its API
+		var groups []models.Group
+		require.NoError(t, db.Find(&groups).Error)
+		require.Len(t, groups, 1)
+		var apis []models.API
+		require.NoError(t, db.Where("group_id = ?", groups[0].ID).Find(&apis).Error)
+		if assert.Len(t, apis, 1) {
+			assert.Equal(t, "List users", apis[0].Name)
+			assert.Equal(t, "/users", apis[0].Endpoint)
+		}
+	})
+
+	t.Run("givenOpenAPIFileAndDryRun_whenImport_thenPreviewWithoutWriting", func(t *testing.T) {
+		// Arrange
+		db := setupTestDB(t)
+		app := setupImportTestApp(db)
+
+		// Act
+		resp, err := app.Test(postImportRequest(t, openAPIImportFixture(), "true"))
+		require.NoError(t, err)
+
+		// Assert - preview counts are returned
+		assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+
+		var body struct {
+			Success bool               `json:"success"`
+			Data    importResponseData `json:"data"`
+		}
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+		assert.True(t, body.Success)
+		assert.Equal(t, "openapi", body.Data.Format)
+		assert.Equal(t, 1, body.Data.GroupsCreated)
+		assert.Equal(t, 1, body.Data.APIsImported)
+
+		// Assert - nothing was written
+		var count int64
+		db.Model(&models.API{}).Count(&count)
+		assert.Equal(t, int64(0), count)
+	})
+
+	t.Run("givenKnotFileWithUnknownVersion_whenImport_thenReturnsBadRequest", func(t *testing.T) {
+		// Arrange - the format marker detects as Knot but the version check
+		// rejects the document during parsing
+		db := setupTestDB(t)
+		app := setupImportTestApp(db)
+
+		// Act
+		resp, err := app.Test(postImportRequest(t, []byte(`{"format": "knot", "version": 2, "groups": []}`), ""))
+		require.NoError(t, err)
+
+		// Assert
+		assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
+
+		var respBody response.Response
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&respBody))
+		assert.False(t, respBody.Success)
+		assert.Contains(t, respBody.Error, "version")
+	})
+
+	t.Run("givenApplyFailure_whenImport_thenReturnsInternalServerError", func(t *testing.T) {
+		// Arrange - a valid Knot upload against a database whose groups
+		// table is missing, so the transactional apply fails
+		db := setupTestDB(t)
+		require.NoError(t, db.Migrator().DropTable(&models.Group{}))
+		app := setupImportTestApp(db)
+
+		// Act
+		resp, err := app.Test(postImportRequest(t, knotImportFixture(), ""))
+		require.NoError(t, err)
+
+		// Assert
+		assert.Equal(t, fiber.StatusInternalServerError, resp.StatusCode)
+
+		var respBody response.Response
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&respBody))
+		assert.False(t, respBody.Success)
+		assert.Contains(t, respBody.Error, "Failed to import document")
+	})
+}

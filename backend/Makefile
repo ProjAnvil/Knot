@@ -50,12 +50,15 @@ test:
 	@go test -v ./...
 
 # Run tests with race detector and coverage, then enforce the 85% gate on
-# the export/import services (param_node, export_knot, export_openapi,
-# export_postman, import_*). Exits non-zero if any gated file is below 85.0%.
+# the new export/import code: the services files matched by
+# param_node/export_knot/export_openapi/export_postman/import_ plus the
+# handlers/import.go and handlers/export.go files (their names lack the
+# underscore, so they are listed explicitly). Exits non-zero if any
+# function in a gated file is below 85.0%.
 test-coverage:
 	@go test ./... -race -covermode=atomic -coverprofile=coverage.out
 	@go tool cover -func=coverage.out
-	@go tool cover -func=coverage.out | grep -E '(param_node|export_knot|export_openapi|export_postman|import_)' | awk '{gsub(/%/,"",$$NF); if ($$NF+0 < 85.0) { print "COVERAGE GATE FAIL:", $$1, $$NF"%"; f=1 }} END { exit f }'
+	@go tool cover -func=coverage.out | grep -E '(param_node|export_knot|export_openapi|export_postman|import_|handlers/import\.go|handlers/export\.go)' | awk '{gsub(/%/,"",$$NF); if ($$NF+0 < 85.0) { print "COVERAGE GATE FAIL:", $$1, $$NF"%"; f=1 }} END { exit f }'
 
 # Install dependencies
 deps:
