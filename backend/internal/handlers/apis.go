@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"github.com/ProjAnvil/knot/backend/internal/models"
 	"github.com/ProjAnvil/knot/backend/internal/services"
 	"github.com/ProjAnvil/knot/backend/pkg/response"
+	models "github.com/ProjAnvil/knot/models"
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -274,14 +274,14 @@ func DuplicateAPI(db *gorm.DB) fiber.Handler {
 			for _, p := range sourceAPI.Parameters {
 				if p.ParentID == nil {
 					newParam := models.Parameter{
-						APIID:      newAPI.ID,
-						ParentID:   nil,
-						Name:       p.Name,
-						Type:       p.Type,
+						APIID:       newAPI.ID,
+						ParentID:    nil,
+						Name:        p.Name,
+						Type:        p.Type,
 						Description: p.Description,
-						Required:   p.Required,
-						ParamType:  p.ParamType,
-						Order:      p.Order,
+						Required:    p.Required,
+						ParamType:   p.ParamType,
+						Order:       p.Order,
 					}
 					if err := tx.Create(&newParam).Error; err != nil {
 						return err
@@ -295,14 +295,14 @@ func DuplicateAPI(db *gorm.DB) fiber.Handler {
 				if p.ParentID != nil {
 					newParentID := oldToNew[*p.ParentID]
 					newParam := models.Parameter{
-						APIID:      newAPI.ID,
-						ParentID:   &newParentID,
-						Name:       p.Name,
-						Type:       p.Type,
+						APIID:       newAPI.ID,
+						ParentID:    &newParentID,
+						Name:        p.Name,
+						Type:        p.Type,
 						Description: p.Description,
-						Required:   p.Required,
-						ParamType:  p.ParamType,
-						Order:      p.Order,
+						Required:    p.Required,
+						ParamType:   p.ParamType,
+						Order:       p.Order,
 					}
 					if err := tx.Create(&newParam).Error; err != nil {
 						return err

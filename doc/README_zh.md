@@ -106,6 +106,10 @@ Web 界面将在 [http://localhost:3000](http://localhost:3000) 可用
 - [MCP 使用指南](./MCP_USAGE_GUIDE_zh.md)
 - [开发指南](../CLAUDE.md)
 
+## 模型库
+
+Knot 的数据模型以可导入的 Go 模块形式发布在 [`models/`](../models/) 目录：包含领域类型（`Group`、`API`、`Parameter`）、Knot JSON v1 线格式类型和校验常量，并提供 JSON Schema 与 TypeScript 声明，方便非 Go 使用方接入。该模块通过 `models/v*` 标签独立版本化，安装、semver 策略与产物说明详见[模型库 README](../models/README.md)。
+
 ## 配置
 
 Knot 的配置文件存储位置：

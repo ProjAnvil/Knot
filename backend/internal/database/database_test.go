@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/ProjAnvil/knot/backend/internal/config"
-	"github.com/ProjAnvil/knot/backend/internal/models"
+	models "github.com/ProjAnvil/knot/models"
 )
 
 // setupTestConfig creates a test configuration with a temporary SQLite database

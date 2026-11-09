@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/ProjAnvil/knot/backend/internal/models"
+	models "github.com/ProjAnvil/knot/models"
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
@@ -28,29 +28,29 @@ func setupImportApplyTestDB(t *testing.T) *gorm.DB {
 
 // applyTestPlan builds a plan with two groups covering nested request and
 // response parameter trees, an API without parameters, and a note pointer.
-func applyTestPlan() *ImportPlan {
-	return &ImportPlan{
-		Groups: []ImportGroup{
+func applyTestPlan() *models.ImportPlan {
+	return &models.ImportPlan{
+		Groups: []models.ImportGroup{
 			{
 				Name: "Auth",
-				APIs: []ImportAPI{
+				APIs: []models.ImportAPI{
 					{
 						Name:     "Login",
 						Endpoint: "/auth/login",
 						Method:   "POST",
 						Type:     "HTTP",
 						Note:     strPtr("Login with credentials"),
-						Request: []ParamNode{
+						Request: []models.ParamNode{
 							{
 								Name: "user", Type: "object", Required: true,
-								Children: []ParamNode{
+								Children: []models.ParamNode{
 									{Name: "name", Type: "string", Required: true},
 									{Name: "age", Type: "number"},
 								},
 							},
 							{Name: "remember", Type: "boolean"},
 						},
-						Response: []ParamNode{
+						Response: []models.ParamNode{
 							{Name: "token", Type: "string"},
 							{Name: "expiresIn", Type: "number"},
 						},
@@ -65,16 +65,16 @@ func applyTestPlan() *ImportPlan {
 			},
 			{
 				Name: "Billing",
-				APIs: []ImportAPI{
+				APIs: []models.ImportAPI{
 					{
 						Name:     "ListInvoices",
 						Endpoint: "/billing/invoices",
 						Method:   "GET",
 						Type:     "HTTP",
-						Response: []ParamNode{
+						Response: []models.ParamNode{
 							{
 								Name: "items", Type: "array",
-								Children: []ParamNode{
+								Children: []models.ParamNode{
 									{Name: "id", Type: "string"},
 									{Name: "total", Type: "number"},
 								},
@@ -94,7 +94,7 @@ func TestApplyImport(t *testing.T) {
 		db := setupImportApplyTestDB(t)
 
 		// Act
-		result, err := ApplyImport(db, ImportFormatKnot, applyTestPlan(), false)
+		result, err := ApplyImport(db, models.ImportFormatKnot, applyTestPlan(), false)
 
 		// Assert: exact counts and warnings surfaced from the plan.
 		if err != nil {
@@ -249,21 +249,21 @@ func TestApplyImport(t *testing.T) {
 			}
 		}
 
-		plan := &ImportPlan{
-			Groups: []ImportGroup{
+		plan := &models.ImportPlan{
+			Groups: []models.ImportGroup{
 				{
 					Name: "Auth",
-					APIs: []ImportAPI{
+					APIs: []models.ImportAPI{
 						{Name: "New X", Endpoint: "/new-x", Method: "POST", Type: "HTTP"},
 						{Name: "New Y", Endpoint: "/new-y", Method: "GET", Type: "RPC",
-							Request: []ParamNode{{Name: "p", Type: "string"}}},
+							Request: []models.ParamNode{{Name: "p", Type: "string"}}},
 					},
 				},
 			},
 		}
 
 		// Act
-		result, err := ApplyImport(db, ImportFormatPostman, plan, false)
+		result, err := ApplyImport(db, models.ImportFormatPostman, plan, false)
 
 		// Assert
 		if err != nil {
@@ -320,14 +320,14 @@ func TestApplyImport(t *testing.T) {
 			}
 		}
 
-		plan := &ImportPlan{
-			Groups: []ImportGroup{
-				{Name: "C", APIs: []ImportAPI{{Name: "c1", Endpoint: "/c", Method: "GET", Type: "HTTP"}}},
+		plan := &models.ImportPlan{
+			Groups: []models.ImportGroup{
+				{Name: "C", APIs: []models.ImportAPI{{Name: "c1", Endpoint: "/c", Method: "GET", Type: "HTTP"}}},
 			},
 		}
 
 		// Act
-		result, err := ApplyImport(db, ImportFormatOpenAPI, plan, false)
+		result, err := ApplyImport(db, models.ImportFormatOpenAPI, plan, false)
 
 		// Assert
 		if err != nil {
@@ -368,20 +368,20 @@ func TestApplyImport(t *testing.T) {
 			}
 			return db
 		}
-		buildPlan := func() *ImportPlan {
-			return &ImportPlan{
-				Groups: []ImportGroup{
+		buildPlan := func() *models.ImportPlan {
+			return &models.ImportPlan{
+				Groups: []models.ImportGroup{
 					{
 						Name: "Auth", // merge path
-						APIs: []ImportAPI{
+						APIs: []models.ImportAPI{
 							{Name: "Merged API", Endpoint: "/m", Method: "POST", Type: "HTTP",
-								Request:  []ParamNode{{Name: "q", Type: "string"}},
-								Response: []ParamNode{{Name: "r", Type: "number"}}},
+								Request:  []models.ParamNode{{Name: "q", Type: "string"}},
+								Response: []models.ParamNode{{Name: "r", Type: "number"}}},
 						},
 					},
 					{
 						Name: "Fresh", // create path
-						APIs: []ImportAPI{
+						APIs: []models.ImportAPI{
 							{Name: "Fresh API", Endpoint: "/f", Method: "GET", Type: "HTTP"},
 						},
 					},
@@ -394,11 +394,11 @@ func TestApplyImport(t *testing.T) {
 		dryDB := seed(t)
 
 		// Act
-		realResult, err := ApplyImport(realDB, ImportFormatOpenAPI, buildPlan(), false)
+		realResult, err := ApplyImport(realDB, models.ImportFormatOpenAPI, buildPlan(), false)
 		if err != nil {
 			t.Fatalf("Expected no error from real run, got: %v", err)
 		}
-		dryResult, err := ApplyImport(dryDB, ImportFormatOpenAPI, buildPlan(), true)
+		dryResult, err := ApplyImport(dryDB, models.ImportFormatOpenAPI, buildPlan(), true)
 		if err != nil {
 			t.Fatalf("Expected no error from dry run, got: %v", err)
 		}
@@ -432,19 +432,19 @@ func TestApplyImport(t *testing.T) {
 
 	t.Run("givenPlanWarnings_whenApplyImport_thenWarningsSurfacedInBothModes", func(t *testing.T) {
 		// Arrange
-		plan := &ImportPlan{
-			Groups: []ImportGroup{
-				{Name: "G", APIs: []ImportAPI{{Name: "a", Endpoint: "/a", Method: "GET", Type: "HTTP"}}},
+		plan := &models.ImportPlan{
+			Groups: []models.ImportGroup{
+				{Name: "G", APIs: []models.ImportAPI{{Name: "a", Endpoint: "/a", Method: "GET", Type: "HTTP"}}},
 			},
 			Warnings: []string{"warning one", "warning two"},
 		}
 
 		// Act
-		realResult, err := ApplyImport(setupImportApplyTestDB(t), ImportFormatKnot, plan, false)
+		realResult, err := ApplyImport(setupImportApplyTestDB(t), models.ImportFormatKnot, plan, false)
 		if err != nil {
 			t.Fatalf("Expected no error from real run, got: %v", err)
 		}
-		dryResult, err := ApplyImport(setupImportApplyTestDB(t), ImportFormatKnot, plan, true)
+		dryResult, err := ApplyImport(setupImportApplyTestDB(t), models.ImportFormatKnot, plan, true)
 		if err != nil {
 			t.Fatalf("Expected no error from dry run, got: %v", err)
 		}
@@ -477,13 +477,13 @@ func TestApplyImport(t *testing.T) {
 			t.Fatalf("Failed to seed param: %v", err)
 		}
 
-		plan := &ImportPlan{
-			Groups: []ImportGroup{
+		plan := &models.ImportPlan{
+			Groups: []models.ImportGroup{
 				{
 					Name: "New",
-					APIs: []ImportAPI{
+					APIs: []models.ImportAPI{
 						{Name: "First", Endpoint: "/first", Method: "GET", Type: "HTTP",
-							Request: []ParamNode{{Name: "p", Type: "string"}}},
+							Request: []models.ParamNode{{Name: "p", Type: "string"}}},
 						{Name: "Second", Endpoint: "/second", Method: "GET", Type: "HTTP"},
 					},
 				},
@@ -505,7 +505,7 @@ func TestApplyImport(t *testing.T) {
 		defer db.Callback().Create().Remove(callbackName)
 
 		// Act
-		result, err := ApplyImport(db, ImportFormatKnot, plan, false)
+		result, err := ApplyImport(db, models.ImportFormatKnot, plan, false)
 
 		// Assert
 		if err == nil {
@@ -555,21 +555,21 @@ func assertRowCounts(t *testing.T, db *gorm.DB, groups, apis, params int) {
 func TestApplyImport_InPlanDuplicateGroup(t *testing.T) {
 	// Arrange - one plan listing Auth twice with one API each
 	db := setupImportApplyTestDB(t)
-	plan := &ImportPlan{
-		Groups: []ImportGroup{
+	plan := &models.ImportPlan{
+		Groups: []models.ImportGroup{
 			{
 				Name: "Auth",
-				APIs: []ImportAPI{{Name: "Login", Endpoint: "/login", Method: "POST", Type: "HTTP"}},
+				APIs: []models.ImportAPI{{Name: "Login", Endpoint: "/login", Method: "POST", Type: "HTTP"}},
 			},
 			{
 				Name: "Auth",
-				APIs: []ImportAPI{{Name: "Logout", Endpoint: "/logout", Method: "POST", Type: "HTTP"}},
+				APIs: []models.ImportAPI{{Name: "Logout", Endpoint: "/logout", Method: "POST", Type: "HTTP"}},
 			},
 		},
 	}
 
 	// Act
-	result, err := ApplyImport(db, ImportFormatPostman, plan, false)
+	result, err := ApplyImport(db, models.ImportFormatPostman, plan, false)
 
 	// Assert - one created group plus one in-plan merge
 	if err != nil {
@@ -611,15 +611,15 @@ func TestApplyImport_ErrorPropagation(t *testing.T) {
 	if err := db.Migrator().DropTable(&models.Group{}); err != nil {
 		t.Fatalf("Failed to drop groups table: %v", err)
 	}
-	plan := &ImportPlan{
-		Groups: []ImportGroup{{
+	plan := &models.ImportPlan{
+		Groups: []models.ImportGroup{{
 			Name: "Auth",
-			APIs: []ImportAPI{{Name: "Login", Endpoint: "/login", Method: "POST", Type: "HTTP"}},
+			APIs: []models.ImportAPI{{Name: "Login", Endpoint: "/login", Method: "POST", Type: "HTTP"}},
 		}},
 	}
 
 	// Act
-	result, err := ApplyImport(db, ImportFormatPostman, plan, false)
+	result, err := ApplyImport(db, models.ImportFormatPostman, plan, false)
 
 	// Assert
 	if err == nil {

@@ -4,6 +4,8 @@ import (
 	"io"
 	"strconv"
 
+	models "github.com/ProjAnvil/knot/models"
+
 	"github.com/ProjAnvil/knot/backend/internal/services"
 	"github.com/ProjAnvil/knot/backend/pkg/response"
 	"github.com/gofiber/fiber/v2"
@@ -41,13 +43,13 @@ func ImportDocument(db *gorm.DB) fiber.Handler {
 			return response.Error(c, fiber.StatusUnsupportedMediaType, err.Error())
 		}
 
-		var plan *services.ImportPlan
+		var plan *models.ImportPlan
 		switch format {
-		case services.ImportFormatKnot:
+		case models.ImportFormatKnot:
 			plan, err = services.ParseKnotJSON(data)
-		case services.ImportFormatPostman:
+		case models.ImportFormatPostman:
 			plan, err = services.ParsePostmanCollection(data)
-		case services.ImportFormatOpenAPI:
+		case models.ImportFormatOpenAPI:
 			plan, err = services.ParseOpenAPIDocument(data)
 		default:
 			return response.Error(c, fiber.StatusUnsupportedMediaType, "Unsupported file format")

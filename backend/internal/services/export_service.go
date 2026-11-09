@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ProjAnvil/knot/backend/internal/models"
+	models "github.com/ProjAnvil/knot/models"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 )
@@ -282,7 +282,7 @@ func GenerateHTML(apis []APIWithParams, locale string) string {
         </div>
 `, index, api.API.Name, strings.ToLower(api.API.Method), api.API.Method, api.API.Endpoint, api.API.Type))
 
-			apisHTML.WriteString(fmt.Sprintf(`
+		apisHTML.WriteString(fmt.Sprintf(`
         <div class="section">
           <h3>%s</h3>
           %s

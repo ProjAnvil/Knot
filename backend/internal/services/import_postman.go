@@ -5,19 +5,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	models "github.com/ProjAnvil/knot/models"
 )
 
 // postmanParser carries the accumulator state while walking a Postman
 // collection: the plan under construction plus a group-name → index map so
 // folders that resolve to the same path merge into a single group.
 type postmanParser struct {
-	plan           *ImportPlan
+	plan           *models.ImportPlan
 	groupIndex     map[string]int
 	unnamedDropped int
 }
 
 // ParsePostmanCollection parses a Postman Collection v2.0/v2.1 document
-// into an ImportPlan per spec §8.3. item[] is walked recursively: an item
+// into a models.ImportPlan per spec §8.3. item[] is walked recursively: an item
 // with a nested item array is a folder whose group name flattens the
 // nesting with "/" separators (top-level folders use their own name),
 // while a lone top-level request lands in a group named after info.name.
@@ -28,7 +30,7 @@ type postmanParser struct {
 // as a JSON object is converted to request ParamNodes; unconvertible
 // bodies record a warning instead of failing. A UTF-8 BOM is tolerated so
 // any file accepted by DetectImportFormat parses.
-func ParsePostmanCollection(data []byte) (*ImportPlan, error) {
+func ParsePostmanCollection(data []byte) (*models.ImportPlan, error) {
 	data = bytes.TrimPrefix(data, utf8BOM)
 
 	var root map[string]interface{}
@@ -37,7 +39,7 @@ func ParsePostmanCollection(data []byte) (*ImportPlan, error) {
 	}
 
 	parser := &postmanParser{
-		plan:       &ImportPlan{Groups: []ImportGroup{}, Warnings: []string{}},
+		plan:       &models.ImportPlan{Groups: []models.ImportGroup{}, Warnings: []string{}},
 		groupIndex: make(map[string]int),
 	}
 	collectionName := postmanStringValue(postmanMapValue(root["info"])["name"])
@@ -72,7 +74,7 @@ func (p *postmanParser) walkItems(items []interface{}, folderPath, requestGroup 
 	}
 }
 
-// addRequest converts one request item into an ImportAPI appended to the
+// addRequest converts one request item into a models.ImportAPI appended to the
 // group named groupName. A request whose group name resolves to empty is
 // dropped with a warning (never an error); a missing item name falls back
 // to the endpoint, then to "Unnamed request", with a warning; an item
@@ -102,11 +104,11 @@ func (p *postmanParser) addRequest(item map[string]interface{}, groupName string
 			fmt.Sprintf("group %q: request without a name imported as %q", groupName, name))
 	}
 
-	api := ImportAPI{
+	api := models.ImportAPI{
 		Name:     name,
 		Endpoint: endpoint,
-		Request:  []ParamNode{},
-		Response: []ParamNode{},
+		Request:  []models.ParamNode{},
+		Response: []models.ParamNode{},
 	}
 	if postmanStringValue(item["x-knot-type"]) == "rpc" {
 		api.Type = "RPC"
@@ -123,7 +125,7 @@ func (p *postmanParser) addRequest(item map[string]interface{}, groupName string
 	if !seen {
 		index = len(p.plan.Groups)
 		p.groupIndex[groupName] = index
-		p.plan.Groups = append(p.plan.Groups, ImportGroup{Name: groupName, APIs: []ImportAPI{}})
+		p.plan.Groups = append(p.plan.Groups, models.ImportGroup{Name: groupName, APIs: []models.ImportAPI{}})
 	}
 	p.plan.Groups[index].APIs = append(p.plan.Groups[index].APIs, api)
 }
@@ -132,10 +134,10 @@ func (p *postmanParser) addRequest(item map[string]interface{}, groupName string
 // Other body modes (formdata, urlencoded, file, graphql) are ignored per
 // spec §8.3. A raw body that does not parse as a JSON object records a
 // warning naming the item and yields no nodes.
-func (p *postmanParser) postmanRequestBody(body interface{}, itemName string) []ParamNode {
+func (p *postmanParser) postmanRequestBody(body interface{}, itemName string) []models.ParamNode {
 	bodyMap, ok := body.(map[string]interface{})
 	if !ok || postmanStringValue(bodyMap["mode"]) != "raw" {
-		return []ParamNode{}
+		return []models.ParamNode{}
 	}
 
 	raw := postmanStringValue(bodyMap["raw"])
@@ -143,14 +145,14 @@ func (p *postmanParser) postmanRequestBody(body interface{}, itemName string) []
 	if err := json.Unmarshal([]byte(raw), &decoded); err != nil {
 		p.plan.Warnings = append(p.plan.Warnings,
 			fmt.Sprintf("request %q: raw body is not valid JSON, request parameters skipped", itemName))
-		return []ParamNode{}
+		return []models.ParamNode{}
 	}
 	if _, isObject := decoded.(map[string]interface{}); !isObject {
 		p.plan.Warnings = append(p.plan.Warnings,
 			fmt.Sprintf("request %q: raw body is not a JSON object, request parameters skipped", itemName))
-		return []ParamNode{}
+		return []models.ParamNode{}
 	}
-	return ParamNodesFromJSONValue(decoded)
+	return models.ParamNodesFromJSONValue(decoded)
 }
 
 // postmanEndpoint extracts the endpoint from request.url, which Postman

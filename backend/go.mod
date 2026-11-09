@@ -1,8 +1,9 @@
 module github.com/ProjAnvil/knot/backend
 
-go 1.25.4
+go 1.25.5
 
 require (
+	github.com/ProjAnvil/knot/models v1.0.0
 	github.com/glebarez/sqlite v1.11.0
 	github.com/gofiber/fiber/v2 v2.52.10
 	github.com/spf13/cobra v1.10.1
@@ -15,6 +16,11 @@ require (
 	gorm.io/driver/postgres v1.6.0
 	gorm.io/gorm v1.31.1
 )
+
+// Permanent in-repo redirect to the sibling models module; external consumers
+// resolve the published models/vX.Y.Z tag instead. Directory replaces need no
+// go.sum entries.
+replace github.com/ProjAnvil/knot/models => ../models
 
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect

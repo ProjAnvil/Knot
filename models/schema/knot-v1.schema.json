@@ -1,0 +1,155 @@
+{
+  "$defs": {
+    "KnotExportAPI": {
+      "additionalProperties": false,
+      "properties": {
+        "endpoint": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "order": {
+          "type": "integer"
+        },
+        "parameters": {
+          "$ref": "#/$defs/KnotExportParams"
+        },
+        "type": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "endpoint",
+        "method",
+        "type",
+        "order",
+        "note",
+        "parameters"
+      ],
+      "type": "object"
+    },
+    "KnotExportGroup": {
+      "additionalProperties": false,
+      "properties": {
+        "apis": {
+          "items": {
+            "$ref": "#/$defs/KnotExportAPI"
+          },
+          "type": "array"
+        },
+        "name": {
+          "type": "string"
+        },
+        "order": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "order",
+        "apis"
+      ],
+      "type": "object"
+    },
+    "KnotExportParams": {
+      "additionalProperties": false,
+      "properties": {
+        "request": {
+          "items": {
+            "$ref": "#/$defs/ParamNode"
+          },
+          "type": "array"
+        },
+        "response": {
+          "items": {
+            "$ref": "#/$defs/ParamNode"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "request",
+        "response"
+      ],
+      "type": "object"
+    },
+    "ParamNode": {
+      "additionalProperties": false,
+      "properties": {
+        "children": {
+          "items": {
+            "$ref": "#/$defs/ParamNode"
+          },
+          "type": "array"
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "order": {
+          "type": "integer"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "type": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "type",
+        "required",
+        "description",
+        "order",
+        "children"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://github.com/ProjAnvil/knot/models/schema/knot-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "exportedAt": {
+      "type": "string"
+    },
+    "format": {
+      "const": "knot",
+      "type": "string"
+    },
+    "groups": {
+      "items": {
+        "$ref": "#/$defs/KnotExportGroup"
+      },
+      "type": "array"
+    },
+    "version": {
+      "const": 1,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "format",
+    "version",
+    "exportedAt",
+    "groups"
+  ],
+  "type": "object"
+}

@@ -3,6 +3,8 @@ package services
 import (
 	"strings"
 	"testing"
+
+	models "github.com/ProjAnvil/knot/models"
 )
 
 // TestParsePostmanCollection covers the Postman Collection v2.0/v2.1
@@ -195,7 +197,7 @@ func TestParsePostmanCollection(t *testing.T) {
 
 	t.Run("givenRawJSONBody_whenParse_thenRequestParamNodes", func(t *testing.T) {
 		// Arrange - raw body with a JSON object mixing primitives and a
-		// nested object; ParamNodesFromJSONValue sorts keys alphabetically
+		// nested object; models.ParamNodesFromJSONValue sorts keys alphabetically
 		data := []byte(`{
 			"info": {"name": "Collection"},
 			"item": [{"name": "Create user", "request": {"method": "POST", "url": "/users",
@@ -210,11 +212,11 @@ func TestParsePostmanCollection(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Expected no error, got %v", err)
 		}
-		want := []ParamNode{
-			{Name: "count", Type: "number", Order: 0, Children: []ParamNode{}},
-			{Name: "user", Type: "object", Order: 1, Children: []ParamNode{
-				{Name: "admin", Type: "boolean", Order: 0, Children: []ParamNode{}},
-				{Name: "name", Type: "string", Order: 1, Children: []ParamNode{}},
+		want := []models.ParamNode{
+			{Name: "count", Type: "number", Order: 0, Children: []models.ParamNode{}},
+			{Name: "user", Type: "object", Order: 1, Children: []models.ParamNode{
+				{Name: "admin", Type: "boolean", Order: 0, Children: []models.ParamNode{}},
+				{Name: "name", Type: "string", Order: 1, Children: []models.ParamNode{}},
 			}},
 		}
 		api := plan.Groups[0].APIs[0]

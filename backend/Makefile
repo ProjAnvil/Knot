@@ -61,7 +61,7 @@ test-coverage:
 	@go test ./... -race -covermode=atomic -coverprofile=coverage.out
 	@func_report=$$(go tool cover -func=coverage.out); \
 	printf '%s\n' "$$func_report"; \
-	gated=$$(printf '%s\n' "$$func_report" | grep -E '(param_node|export_knot|export_openapi|export_postman|import_|handlers/import\.go|handlers/export\.go)'); \
+	gated=$$(printf '%s\n' "$$func_report" | grep -E '(export_knot|export_openapi|export_postman|import_|handlers/import\.go|handlers/export\.go)'); \
 	if [ -z "$$gated" ]; then \
 		echo "COVERAGE GATE FAIL: no functions matched the gated-file pattern (renamed or missing files?)"; \
 		exit 1; \

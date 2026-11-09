@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ProjAnvil/knot/backend/internal/models"
+	models "github.com/ProjAnvil/knot/models"
 )
 
 // TestExportService_BuildParameterTree_GivenEmptyList_whenBuildTree_thenEmptyResult
@@ -606,13 +606,13 @@ func TestExportService_GenerateHTML_GivenEnglishLocale_whenGenerate_thenEnglishT
 	apis := []APIWithParams{
 		{
 			API: models.API{
-				ID:        1,
-				GroupID:   1,
-				Name:      "Get User",
-				Endpoint:  "/api/users/{id}",
-				Method:    "GET",
-				Type:      "HTTP",
-				Note:      &desc,
+				ID:       1,
+				GroupID:  1,
+				Name:     "Get User",
+				Endpoint: "/api/users/{id}",
+				Method:   "GET",
+				Type:     "HTTP",
+				Note:     &desc,
 			},
 			GroupName: "User Management",
 			RequestParameters: []models.Parameter{
@@ -667,13 +667,13 @@ func TestExportService_GenerateHTML_GivenChineseLocale_whenGenerate_thenChineseT
 	apis := []APIWithParams{
 		{
 			API: models.API{
-				ID:        1,
-				GroupID:   1,
-				Name:      "获取用户",
-				Endpoint:  "/api/users/{id}",
-				Method:    "GET",
-				Type:      "HTTP",
-				Note:      &desc,
+				ID:       1,
+				GroupID:  1,
+				Name:     "获取用户",
+				Endpoint: "/api/users/{id}",
+				Method:   "GET",
+				Type:     "HTTP",
+				Note:     &desc,
 			},
 			GroupName: "用户管理",
 			RequestParameters: []models.Parameter{
@@ -724,19 +724,19 @@ func TestExportService_GenerateHTML_GivenMultipleGroups_whenGenerate_thenSidebar
 	// Arrange
 	apis := []APIWithParams{
 		{
-			API: models.API{ID: 1, GroupID: 1, Name: "API 1", Endpoint: "/api/1", Method: "GET", Type: "HTTP"},
+			API:                models.API{ID: 1, GroupID: 1, Name: "API 1", Endpoint: "/api/1", Method: "GET", Type: "HTTP"},
 			GroupName:          "Group A",
 			RequestParameters:  []models.Parameter{},
 			ResponseParameters: []models.Parameter{},
 		},
 		{
-			API: models.API{ID: 2, GroupID: 2, Name: "API 2", Endpoint: "/api/2", Method: "POST", Type: "HTTP"},
+			API:                models.API{ID: 2, GroupID: 2, Name: "API 2", Endpoint: "/api/2", Method: "POST", Type: "HTTP"},
 			GroupName:          "Group B",
 			RequestParameters:  []models.Parameter{},
 			ResponseParameters: []models.Parameter{},
 		},
 		{
-			API: models.API{ID: 3, GroupID: 1, Name: "API 3", Endpoint: "/api/3", Method: "PUT", Type: "HTTP"},
+			API:                models.API{ID: 3, GroupID: 1, Name: "API 3", Endpoint: "/api/3", Method: "PUT", Type: "HTTP"},
 			GroupName:          "Group A",
 			RequestParameters:  []models.Parameter{},
 			ResponseParameters: []models.Parameter{},

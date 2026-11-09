@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	models "github.com/ProjAnvil/knot/models"
 )
 
 // openapiMethods lists the HTTP method keys of an OpenAPI Path Item Object
@@ -29,12 +31,12 @@ const (
 // decoded document (the resolution root for $ref) and a group-name → index
 // map so operations sharing a tag merge into a single group.
 type openapiParser struct {
-	plan       *ImportPlan
+	plan       *models.ImportPlan
 	doc        map[string]interface{}
 	groupIndex map[string]int
 }
 
-// ParseOpenAPIDocument parses an OpenAPI 3.x document into an ImportPlan
+// ParseOpenAPIDocument parses an OpenAPI 3.x document into a models.ImportPlan
 // per spec §8.3. Path items are walked in sorted path order and each
 // operation key (get/post/put/delete/patch/head/options/trace) in the
 // fixed method order; other path-item keys (parameters, summary, ...) and
@@ -49,7 +51,7 @@ type openapiParser struct {
 // the document with a visited-set cycle guard and a depth cap; offending
 // subtrees are skipped with recorded warnings. A UTF-8 BOM is tolerated so
 // any file accepted by DetectImportFormat parses.
-func ParseOpenAPIDocument(data []byte) (*ImportPlan, error) {
+func ParseOpenAPIDocument(data []byte) (*models.ImportPlan, error) {
 	data = bytes.TrimPrefix(data, utf8BOM)
 
 	var doc map[string]interface{}
@@ -58,7 +60,7 @@ func ParseOpenAPIDocument(data []byte) (*ImportPlan, error) {
 	}
 
 	parser := &openapiParser{
-		plan:       &ImportPlan{Groups: []ImportGroup{}, Warnings: []string{}},
+		plan:       &models.ImportPlan{Groups: []models.ImportGroup{}, Warnings: []string{}},
 		doc:        doc,
 		groupIndex: make(map[string]int),
 	}
@@ -82,7 +84,7 @@ func (p *openapiParser) walkPaths(paths map[string]interface{}) {
 	}
 }
 
-// addOperation converts one operation object into an ImportAPI appended to
+// addOperation converts one operation object into a models.ImportAPI appended to
 // the group named by its first tag (groups are created lazily, so plan
 // group order is first-appearance order over the sorted paths).
 func (p *openapiParser) addOperation(path, method string, op map[string]interface{}) {
@@ -95,11 +97,11 @@ func (p *openapiParser) addOperation(path, method string, op map[string]interfac
 		name = upperMethod + " " + path
 	}
 
-	api := ImportAPI{
+	api := models.ImportAPI{
 		Name:     name,
 		Endpoint: path,
-		Request:  []ParamNode{},
-		Response: []ParamNode{},
+		Request:  []models.ParamNode{},
+		Response: []models.ParamNode{},
 	}
 	if openapiStringValue(op["x-knot-type"]) == "rpc" {
 		api.Type = "RPC"
@@ -118,7 +120,7 @@ func (p *openapiParser) addOperation(path, method string, op map[string]interfac
 	if !seen {
 		index = len(p.plan.Groups)
 		p.groupIndex[group] = index
-		p.plan.Groups = append(p.plan.Groups, ImportGroup{Name: group, APIs: []ImportAPI{}})
+		p.plan.Groups = append(p.plan.Groups, models.ImportGroup{Name: group, APIs: []models.ImportAPI{}})
 	}
 	p.plan.Groups[index].APIs = append(p.plan.Groups[index].APIs, api)
 }
@@ -126,9 +128,9 @@ func (p *openapiParser) addOperation(path, method string, op map[string]interfac
 // schemaNodes converts one operation-level JSON Schema into ParamNodes,
 // starting a fresh visited set for the $ref cycle guard; a nil schema
 // yields an empty (non-nil) slice.
-func (p *openapiParser) schemaNodes(schema map[string]interface{}) []ParamNode {
+func (p *openapiParser) schemaNodes(schema map[string]interface{}) []models.ParamNode {
 	if schema == nil {
-		return []ParamNode{}
+		return []models.ParamNode{}
 	}
 	return jsonSchemaToNodes(schema, p.doc, map[string]bool{}, 0, &p.plan.Warnings)
 }
@@ -202,7 +204,7 @@ func openapiContentJSONSchema(raw interface{}) map[string]interface{} {
 
 // JSONSchemaToNodes is the inverse of NodesToJSONSchema: it converts a
 // JSON Schema (an object schema whose properties are the nodes, or a $ref
-// to one) back into the ParamNode forest it describes. Property names are
+// to one) back into the models.ParamNode forest it describes. Property names are
 // sorted for deterministic node order and Order values, the schema's
 // "required" array marks required nodes, nested object schemas nest as
 // children, array "items" become the array node's children, leaf types map
@@ -211,7 +213,7 @@ func openapiContentJSONSchema(raw interface{}) map[string]interface{} {
 // guard; subtrees behind cyclic, external, unresolvable or too-deeply
 // nested references are skipped (the warning-recording variant used by
 // ParseOpenAPIDocument reports them; this entry point drops them).
-func JSONSchemaToNodes(schema map[string]interface{}, root map[string]interface{}, visited map[string]bool, depth int) []ParamNode {
+func JSONSchemaToNodes(schema map[string]interface{}, root map[string]interface{}, visited map[string]bool, depth int) []models.ParamNode {
 	if visited == nil {
 		visited = map[string]bool{}
 	}
@@ -222,21 +224,21 @@ func JSONSchemaToNodes(schema map[string]interface{}, root map[string]interface{
 // jsonSchemaToNodes is the warning-recording core of JSONSchemaToNodes: it
 // converts an object schema (or a $ref to one) at the given depth into the
 // nodes of its properties.
-func jsonSchemaToNodes(schema map[string]interface{}, root map[string]interface{}, visited map[string]bool, depth int, warnings *[]string) []ParamNode {
+func jsonSchemaToNodes(schema map[string]interface{}, root map[string]interface{}, visited map[string]bool, depth int, warnings *[]string) []models.ParamNode {
 	if schema == nil {
-		return []ParamNode{}
+		return []models.ParamNode{}
 	}
 	if depth > openapiMaxSchemaDepth {
 		openapiWarnDepth(warnings)
-		return []ParamNode{}
+		return []models.ParamNode{}
 	}
-	return derefOpenAPISchema(schema, root, visited, warnings, func(s map[string]interface{}) []ParamNode {
+	return derefOpenAPISchema(schema, root, visited, warnings, func(s map[string]interface{}) []models.ParamNode {
 		properties := openapiMapValue(s["properties"])
 		if properties == nil {
-			return []ParamNode{}
+			return []models.ParamNode{}
 		}
 		required := openapiStringSet(s["required"])
-		nodes := make([]ParamNode, 0, len(properties))
+		nodes := make([]models.ParamNode, 0, len(properties))
 		for i, key := range openapiSortedKeys(properties) {
 			if node := openapiPropertyNode(key, properties[key], required[key], i, root, visited, depth+1, warnings); node != nil {
 				nodes = append(nodes, *node)
@@ -246,9 +248,9 @@ func jsonSchemaToNodes(schema map[string]interface{}, root map[string]interface{
 	})
 }
 
-// openapiPropertyNode converts one property's schema into a ParamNode, or
+// openapiPropertyNode converts one property's schema into a models.ParamNode, or
 // nil when the whole subtree must be skipped (depth cap or a skipped $ref).
-func openapiPropertyNode(name string, schema interface{}, required bool, order int, root map[string]interface{}, visited map[string]bool, depth int, warnings *[]string) *ParamNode {
+func openapiPropertyNode(name string, schema interface{}, required bool, order int, root map[string]interface{}, visited map[string]bool, depth int, warnings *[]string) *models.ParamNode {
 	if depth > openapiMaxSchemaDepth {
 		openapiWarnDepth(warnings)
 		return nil
@@ -256,15 +258,15 @@ func openapiPropertyNode(name string, schema interface{}, required bool, order i
 	schemaMap := openapiMapValue(schema)
 	if schemaMap == nil {
 		// Malformed property schema: keep the field visible as a leaf.
-		return &ParamNode{Name: name, Type: "string", Required: required, Order: order, Children: []ParamNode{}}
+		return &models.ParamNode{Name: name, Type: "string", Required: required, Order: order, Children: []models.ParamNode{}}
 	}
-	return derefOpenAPISchema(schemaMap, root, visited, warnings, func(s map[string]interface{}) *ParamNode {
-		node := &ParamNode{
+	return derefOpenAPISchema(schemaMap, root, visited, warnings, func(s map[string]interface{}) *models.ParamNode {
+		node := &models.ParamNode{
 			Name:     name,
 			Type:     openapiSchemaNodeType(s),
 			Required: required,
 			Order:    order,
-			Children: []ParamNode{},
+			Children: []models.ParamNode{},
 		}
 		if description := openapiStringValue(s["description"]); description != "" {
 			node.Description = &description
@@ -284,20 +286,20 @@ func openapiPropertyNode(name string, schema interface{}, required bool, order i
 // (mirroring how NodesToJSONSchema packs element fields into an object
 // element schema); an absent or empty items schema contributes none; any
 // other shape degrades to a single "item" child.
-func openapiArrayItemNodes(items interface{}, root map[string]interface{}, visited map[string]bool, depth int, warnings *[]string) []ParamNode {
+func openapiArrayItemNodes(items interface{}, root map[string]interface{}, visited map[string]bool, depth int, warnings *[]string) []models.ParamNode {
 	itemsSchema := openapiMapValue(items)
 	if len(itemsSchema) == 0 {
-		return []ParamNode{}
+		return []models.ParamNode{}
 	}
-	return derefOpenAPISchema(itemsSchema, root, visited, warnings, func(s map[string]interface{}) []ParamNode {
+	return derefOpenAPISchema(itemsSchema, root, visited, warnings, func(s map[string]interface{}) []models.ParamNode {
 		if openapiSchemaNodeType(s) == "object" {
 			return jsonSchemaToNodes(s, root, visited, depth, warnings)
 		}
 		node := openapiPropertyNode("item", s, false, 0, root, visited, depth, warnings)
 		if node == nil {
-			return []ParamNode{}
+			return []models.ParamNode{}
 		}
-		return []ParamNode{*node}
+		return []models.ParamNode{*node}
 	})
 }
 
@@ -342,9 +344,9 @@ func openapiWarnDepth(warnings *[]string) {
 	*warnings = append(*warnings, fmt.Sprintf("skipped JSON Schema subtree nested deeper than %d levels", openapiMaxSchemaDepth))
 }
 
-// openapiSchemaNodeType maps a schema to its ParamNode type: recognized
+// openapiSchemaNodeType maps a schema to its models.ParamNode type: recognized
 // JSON Schema types pass through, with "integer" narrowing to "number" (the
-// only numeric type ParamNode has); a schema without "type" but with
+// only numeric type models.ParamNode has); a schema without "type" but with
 // "properties" reads as an object; anything else degrades to "string",
 // mirroring the exporter's unknown-type degradation.
 func openapiSchemaNodeType(schema map[string]interface{}) string {

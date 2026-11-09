@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ProjAnvil/knot/backend/internal/models"
+	models "github.com/ProjAnvil/knot/models"
 )
 
 // postmanSchemaURL is the schema URL identifying a Postman Collection

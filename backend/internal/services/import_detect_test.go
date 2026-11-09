@@ -3,6 +3,8 @@ package services
 import (
 	"strings"
 	"testing"
+
+	models "github.com/ProjAnvil/knot/models"
 )
 
 // TestDetectImportFormat covers spec §8.2 format detection: disjoint root
@@ -20,8 +22,8 @@ func TestDetectImportFormat(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Expected no error, got %v", err)
 		}
-		if format != ImportFormatKnot {
-			t.Errorf("Expected format %q, got %q", ImportFormatKnot, format)
+		if format != models.ImportFormatKnot {
+			t.Errorf("Expected format %q, got %q", models.ImportFormatKnot, format)
 		}
 	})
 
@@ -36,8 +38,8 @@ func TestDetectImportFormat(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Expected no error, got %v", err)
 		}
-		if format != ImportFormatPostman {
-			t.Errorf("Expected format %q, got %q", ImportFormatPostman, format)
+		if format != models.ImportFormatPostman {
+			t.Errorf("Expected format %q, got %q", models.ImportFormatPostman, format)
 		}
 	})
 
@@ -52,8 +54,8 @@ func TestDetectImportFormat(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Expected no error, got %v", err)
 		}
-		if format != ImportFormatPostman {
-			t.Errorf("Expected format %q, got %q", ImportFormatPostman, format)
+		if format != models.ImportFormatPostman {
+			t.Errorf("Expected format %q, got %q", models.ImportFormatPostman, format)
 		}
 	})
 
@@ -68,8 +70,8 @@ func TestDetectImportFormat(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Expected no error, got %v", err)
 		}
-		if format != ImportFormatOpenAPI {
-			t.Errorf("Expected format %q, got %q", ImportFormatOpenAPI, format)
+		if format != models.ImportFormatOpenAPI {
+			t.Errorf("Expected format %q, got %q", models.ImportFormatOpenAPI, format)
 		}
 	})
 
@@ -84,8 +86,8 @@ func TestDetectImportFormat(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Expected no error, got %v", err)
 		}
-		if format != ImportFormatOpenAPI {
-			t.Errorf("Expected format %q, got %q", ImportFormatOpenAPI, format)
+		if format != models.ImportFormatOpenAPI {
+			t.Errorf("Expected format %q, got %q", models.ImportFormatOpenAPI, format)
 		}
 	})
 
@@ -167,8 +169,8 @@ func TestDetectImportFormat(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Expected no error for BOM-prefixed knot file, got %v", err)
 		}
-		if format != ImportFormatKnot {
-			t.Errorf("Expected format %q, got %q", ImportFormatKnot, format)
+		if format != models.ImportFormatKnot {
+			t.Errorf("Expected format %q, got %q", models.ImportFormatKnot, format)
 		}
 	})
 

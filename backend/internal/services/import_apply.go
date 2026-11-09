@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ProjAnvil/knot/backend/internal/models"
+	models "github.com/ProjAnvil/knot/models"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -30,7 +30,7 @@ type importGroupState struct {
 	nextAPIOrder int
 }
 
-// ApplyImport persists an ImportPlan into the database with merge semantics,
+// ApplyImport persists a models.ImportPlan into the database with merge semantics,
 // per spec §8.4. The whole import runs inside one transaction: any failure
 // rolls back every row written so far (all-or-nothing). For each plan group,
 // a same-name group is merged into (APIs appended after that group's current
@@ -43,7 +43,7 @@ type importGroupState struct {
 // With dryRun=true the exact same resolution logic runs but no row is
 // written, and the returned counts are the ones a real run would produce.
 // Plan warnings are surfaced in Result.Warnings in both modes.
-func ApplyImport(db *gorm.DB, format ImportFormat, plan *ImportPlan, dryRun bool) (*ImportResult, error) {
+func ApplyImport(db *gorm.DB, format models.ImportFormat, plan *models.ImportPlan, dryRun bool) (*ImportResult, error) {
 	if plan == nil {
 		return nil, errors.New("import plan is nil")
 	}
@@ -64,7 +64,7 @@ func ApplyImport(db *gorm.DB, format ImportFormat, plan *ImportPlan, dryRun bool
 
 // applyImportPlan resolves and (unless dryRun) writes the whole plan inside
 // an open transaction.
-func applyImportPlan(tx *gorm.DB, plan *ImportPlan, dryRun bool, result *ImportResult) error {
+func applyImportPlan(tx *gorm.DB, plan *models.ImportPlan, dryRun bool, result *ImportResult) error {
 	// The next order for a newly created group continues after the current
 	// max group order across all groups. The COALESCE default of -1 makes an
 	// empty table start at 0. The tracker is bumped in memory so a dry run
@@ -144,22 +144,22 @@ func applyImportPlan(tx *gorm.DB, plan *ImportPlan, dryRun bool, result *ImportR
 				}
 			}
 			result.APIsImported++
-			result.ParametersImported += CountNodes(api.Request) + CountNodes(api.Response)
+			result.ParametersImported += models.CountNodes(api.Request) + models.CountNodes(api.Response)
 		}
 	}
 	return nil
 }
 
-// insertParamTree flattens a ParamNode tree into parameter rows inside the
+// insertParamTree flattens a models.ParamNode tree into parameter rows inside the
 // transaction. Each parent row is created first and its database-assigned ID
 // becomes the children's ParentID. Order is a single per-API, per-side
 // sequence starting at 0, assigned in depth-first traversal order (the same
 // convention ParameterService.UpdateParameters follows).
-func insertParamTree(tx *gorm.DB, apiID uint, paramType string, nodes []ParamNode) error {
+func insertParamTree(tx *gorm.DB, apiID uint, paramType string, nodes []models.ParamNode) error {
 	order := 0
 
-	var insert func(nodes []ParamNode, parentID *uint) error
-	insert = func(nodes []ParamNode, parentID *uint) error {
+	var insert func(nodes []models.ParamNode, parentID *uint) error
+	insert = func(nodes []models.ParamNode, parentID *uint) error {
 		for i := range nodes {
 			node := &nodes[i]
 			row := models.Parameter{

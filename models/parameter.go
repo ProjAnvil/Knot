@@ -30,13 +30,15 @@ func (Parameter) TableName() string {
 
 // MarshalJSON customizes JSON serialization to convert timestamps to ISO 8601 strings
 func (p Parameter) MarshalJSON() ([]byte, error) {
-	type Alias Parameter
+	// The alias is unexported so code generators (tygo) do not pick the
+	// local type up as an exported declaration.
+	type alias Parameter
 	return json.Marshal(&struct {
-		*Alias
+		*alias
 		CreatedAt string `json:"createdAt"`
 		UpdatedAt string `json:"updatedAt"`
 	}{
-		Alias:     (*Alias)(&p),
+		alias:     (*alias)(&p),
 		CreatedAt: time.Unix(p.CreatedAt, 0).UTC().Format(time.RFC3339),
 		UpdatedAt: time.Unix(p.UpdatedAt, 0).UTC().Format(time.RFC3339),
 	})

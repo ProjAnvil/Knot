@@ -6,16 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-)
 
-// ImportFormat identifies the exchange format of an uploaded import file.
-// The string values are stable identifiers used by the import handler.
-type ImportFormat string
-
-const (
-	ImportFormatKnot    ImportFormat = "knot-json"
-	ImportFormatPostman ImportFormat = "postman"
-	ImportFormatOpenAPI ImportFormat = "openapi"
+	models "github.com/ProjAnvil/knot/models"
 )
 
 // utf8BOM is the byte-order mark some editors (typically on Windows) prepend
@@ -34,7 +26,7 @@ var utf8BOM = []byte{0xEF, 0xBB, 0xBF}
 //
 // Non-JSON, empty, or unrecognized input is an error. All returned errors
 // carry user-facing messages suitable for a 415-style response.
-func DetectImportFormat(data []byte) (ImportFormat, error) {
+func DetectImportFormat(data []byte) (models.ImportFormat, error) {
 	data = bytes.TrimPrefix(data, utf8BOM)
 	if len(bytes.TrimSpace(data)) == 0 {
 		return "", errors.New("import file is empty")
@@ -49,7 +41,7 @@ func DetectImportFormat(data []byte) (ImportFormat, error) {
 	if raw, ok := root["format"]; ok {
 		var format string
 		if err := json.Unmarshal(raw, &format); err == nil && format == "knot" {
-			return ImportFormatKnot, nil
+			return models.ImportFormatKnot, nil
 		}
 	}
 
@@ -59,7 +51,7 @@ func DetectImportFormat(data []byte) (ImportFormat, error) {
 			Schema string `json:"schema"`
 		}
 		if err := json.Unmarshal(raw, &info); err == nil && strings.Contains(info.Schema, "schema.getpostman.com") {
-			return ImportFormatPostman, nil
+			return models.ImportFormatPostman, nil
 		}
 	}
 
@@ -68,7 +60,7 @@ func DetectImportFormat(data []byte) (ImportFormat, error) {
 		var version string
 		if err := json.Unmarshal(raw, &version); err == nil {
 			if major, _, _ := strings.Cut(version, "."); major == "3" {
-				return ImportFormatOpenAPI, nil
+				return models.ImportFormatOpenAPI, nil
 			}
 		}
 	}

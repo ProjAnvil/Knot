@@ -4,7 +4,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/ProjAnvil/knot/backend/internal/models"
+	models "github.com/ProjAnvil/knot/models"
 )
 
 // OpenAPIDocument is the root object of an OpenAPI 3.1 document built by
@@ -132,7 +132,7 @@ func newOpenAPIOperation(api APIWithParams) *OpenAPIOperation {
 		op.XKnotType = "rpc"
 	}
 
-	requestTree := TreeFromParams(api.RequestParameters)
+	requestTree := models.TreeFromParams(api.RequestParameters)
 	if len(requestTree) > 0 {
 		required := anyNodeRequired(requestTree)
 		op.RequestBody = &OpenAPIRequestBody{
@@ -141,7 +141,7 @@ func newOpenAPIOperation(api APIWithParams) *OpenAPIOperation {
 		}
 	}
 
-	responseTree := TreeFromParams(api.ResponseParameters)
+	responseTree := models.TreeFromParams(api.ResponseParameters)
 	if len(responseTree) > 0 {
 		response := op.Responses["200"]
 		response.Content = jsonContent(NodesToJSONSchema(responseTree, anyNodeRequired(responseTree)))
@@ -200,7 +200,7 @@ func jsonContent(schema map[string]interface{}) map[string]*OpenAPIContent {
 }
 
 // anyNodeRequired reports whether any node in the forest is required.
-func anyNodeRequired(nodes []ParamNode) bool {
+func anyNodeRequired(nodes []models.ParamNode) bool {
 	for _, node := range nodes {
 		if node.Required {
 			return true
@@ -229,7 +229,7 @@ func slugifyOperationID(name string) string {
 	return slug.String()
 }
 
-// NodesToJSONSchema converts a ParamNode forest into the JSON Schema of
+// NodesToJSONSchema converts a models.ParamNode forest into the JSON Schema of
 // the value the forest describes: an implicit object whose properties are
 // the nodes, mirroring GenerateExampleJSON, where each root node becomes
 // one key of the request/response body. objectRequired reports whether
@@ -241,7 +241,7 @@ func slugifyOperationID(name string) string {
 // required: [names of required children]}; array -> {type, items}; leaf
 // types (string|number|boolean) map directly; description is carried on
 // every node that has one.
-func NodesToJSONSchema(nodes []ParamNode, objectRequired bool) map[string]interface{} {
+func NodesToJSONSchema(nodes []models.ParamNode, objectRequired bool) map[string]interface{} {
 	schema := map[string]interface{}{
 		"type":       "object",
 		"properties": propertiesOfNodes(nodes),
@@ -255,7 +255,7 @@ func NodesToJSONSchema(nodes []ParamNode, objectRequired bool) map[string]interf
 }
 
 // propertiesOfNodes maps each node to its schema, keyed by node name.
-func propertiesOfNodes(nodes []ParamNode) map[string]interface{} {
+func propertiesOfNodes(nodes []models.ParamNode) map[string]interface{} {
 	properties := make(map[string]interface{}, len(nodes))
 	for _, node := range nodes {
 		properties[node.Name] = paramNodeToSchema(node)
@@ -264,7 +264,7 @@ func propertiesOfNodes(nodes []ParamNode) map[string]interface{} {
 }
 
 // requiredNodeNames lists the names of required nodes in input order.
-func requiredNodeNames(nodes []ParamNode) []string {
+func requiredNodeNames(nodes []models.ParamNode) []string {
 	var required []string
 	for _, node := range nodes {
 		if node.Required {
@@ -277,7 +277,7 @@ func requiredNodeNames(nodes []ParamNode) []string {
 // objectSchemaOfNodes builds the schema of an object whose properties are
 // the given nodes, always emitting "required" when any node is required
 // (nested object schemas are not gated by objectRequired).
-func objectSchemaOfNodes(nodes []ParamNode) map[string]interface{} {
+func objectSchemaOfNodes(nodes []models.ParamNode) map[string]interface{} {
 	schema := map[string]interface{}{
 		"type":       "object",
 		"properties": propertiesOfNodes(nodes),
@@ -289,10 +289,10 @@ func objectSchemaOfNodes(nodes []ParamNode) map[string]interface{} {
 }
 
 // paramNodeToSchema builds the JSON Schema of a single node.
-func paramNodeToSchema(node ParamNode) map[string]interface{} {
+func paramNodeToSchema(node models.ParamNode) map[string]interface{} {
 	schemaType := node.Type
 	if !isLeafType(schemaType) && schemaType != "object" && schemaType != "array" {
-		// Unknown types degrade to string, mirroring ParamNodesFromJSONValue.
+		// Unknown types degrade to string, mirroring models.ParamNodesFromJSONValue.
 		schemaType = "string"
 	}
 
@@ -317,7 +317,7 @@ func paramNodeToSchema(node ParamNode) map[string]interface{} {
 // GenerateExampleJSON's example values: no children -> a generic schema
 // that allows anything; a single leaf child -> that leaf's schema;
 // otherwise the children form the properties of an object element.
-func arrayItemsSchema(children []ParamNode) map[string]interface{} {
+func arrayItemsSchema(children []models.ParamNode) map[string]interface{} {
 	if len(children) == 0 {
 		return map[string]interface{}{}
 	}

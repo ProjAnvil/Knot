@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/ProjAnvil/knot/backend/internal/models"
+	models "github.com/ProjAnvil/knot/models"
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
@@ -550,8 +550,8 @@ func TestParameterService_UpdateParametersFromJSON_GivenValidJSON_whenConvert_th
 
 	jsonData := map[string]interface{}{
 		"username": "john_doe",
-		"age":       float64(30),
-		"active":    true,
+		"age":      float64(30),
+		"active":   true,
 	}
 
 	// Act
@@ -729,7 +729,7 @@ func TestParameterService_UpdateParametersFromJSON_GivenExistingParams_whenConve
 	// New JSON data with same keys
 	jsonData := map[string]interface{}{
 		"username": "john_doe",
-		"age":       float64(30),
+		"age":      float64(30),
 	}
 
 	// Act
