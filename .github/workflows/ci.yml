@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Note: backend/go.mod's committed `replace github.com/ProjAnvil/knot/models => ../models` is what makes module-mode (GOWORK=off) resolution of the models module possible pre-tag.
+  # Note: backend/go.mod's committed `replace github.com/ProjAnvil/knot/models => ../models` is a permanent in-repo redirect to the sibling module (external consumers resolve the published models/vX.Y.Z tag instead); it is what makes module-mode (GOWORK=off) resolution work, and directory replaces need no go.sum entries.
   backend:
     name: Backend tests
     runs-on: ubuntu-latest

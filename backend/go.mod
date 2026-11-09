@@ -17,8 +17,9 @@ require (
 	gorm.io/gorm v1.31.1
 )
 
-// Dev-time redirect to the in-repo models module so builds work before the
-// v1.0.0 tag is published; ignored by consumers once the tag exists.
+// Permanent in-repo redirect to the sibling models module; external consumers
+// resolve the published models/vX.Y.Z tag instead. Directory replaces need no
+// go.sum entries.
 replace github.com/ProjAnvil/knot/models => ../models
 
 require (

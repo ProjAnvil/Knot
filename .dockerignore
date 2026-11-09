@@ -2,6 +2,7 @@
 .github
 .vscode
 .claude
+.superpowers
 docs
 doc
 mcp-server
@@ -9,4 +10,5 @@ mcp-server
 frontend/dist
 backend/bin
 backend/dist
+**/coverage.out
 **/.DS_Store

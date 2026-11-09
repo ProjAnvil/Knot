@@ -2,8 +2,9 @@ module github.com/ProjAnvil/knot/tools
 
 go 1.25.4
 
-// Dev-time replace, same ruling as backend/go.mod: the models module is not
-// published yet, so an unpublished version cannot resolve through the proxy.
+// Permanent replace, same ruling as backend/go.mod: in-repo builds resolve the
+// sibling models module directly, while external consumers resolve the
+// published models/vX.Y.Z tag. Directory replaces need no go.sum entries.
 replace github.com/ProjAnvil/knot/models => ../models
 
 require (

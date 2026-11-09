@@ -61,7 +61,7 @@ cd backend
 
 ### Database Layer
 - **ORM**: GORM (Go ORM) with multi-database support
-- **Schema**: Defined in `backend/internal/models/`
+- **Schema**: Defined in the `models/` module (`github.com/ProjAnvil/knot/models`)
   - `Group`: API groupings
   - `API`: API endpoints (references groups)
   - `Parameter`: Request/response parameters with nested support (self-referencing for object/array types)
@@ -137,7 +137,7 @@ The backend serves static files using Go's standard library:
 Use GORM in handlers (`backend/internal/handlers/`):
 ```go
 import (
-    "github.com/yourusername/knot/internal/models"
+    "github.com/ProjAnvil/knot/models"
     "gorm.io/gorm"
 )
 
@@ -205,10 +205,12 @@ Configuration is handled in `backend/internal/config/`:
 
 ## Important Files
 
+### Shared Models (Go)
+- `models/`: Database models module at repo root (Group, API, Parameter), importable as `github.com/ProjAnvil/knot/models`
+
 ### Backend (Go)
 - `backend/cmd/server/main.go`: Server entry point
 - `backend/cmd/cli/main.go`: CLI tool entry point
-- `backend/internal/models/`: Database models (Group, API, Parameter)
 - `backend/internal/handlers/`: HTTP request handlers
 - `backend/internal/routes/`: Route definitions
 - `backend/internal/config/`: Configuration management
