@@ -156,6 +156,9 @@ Example configuration:
 }
 ```
 
+The `KNOT_PORT` environment variable overrides the config file port; a
+legacy `PORT` environment variable, when set, takes precedence over both.
+
 ### Database Options
 
 | Database | Use Case | Configuration |

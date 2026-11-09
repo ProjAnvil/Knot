@@ -992,6 +992,29 @@ describe('API Client - Export/Import', () => {
 			})
 		})
 
+		it('should fall back to a format-aware filename when Content-Disposition is missing', async () => {
+			const blob = new Blob(['{}'], { type: 'application/json' })
+
+			mockFetch.mockResolvedValueOnce({
+				ok: true,
+				headers: { get: () => null },
+				blob: async () => blob
+			} as unknown as Response)
+
+			const jsonResult = await exportApis([1], 'openapi')
+			expect(jsonResult).toEqual({ blob, filename: 'knot-export.json' })
+
+			const htmlBlob = new Blob(['<html></html>'], { type: 'text/html' })
+			mockFetch.mockResolvedValueOnce({
+				ok: true,
+				headers: { get: () => null },
+				blob: async () => htmlBlob
+			} as unknown as Response)
+
+			const htmlResult = await exportApis([1], 'html')
+			expect(htmlResult).toEqual({ blob: htmlBlob, filename: 'knot-export.html' })
+		})
+
 		it('should return an error object on non-OK response', async () => {
 			mockFetch.mockResolvedValueOnce({
 				ok: false,

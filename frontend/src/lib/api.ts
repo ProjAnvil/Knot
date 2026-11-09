@@ -387,10 +387,13 @@ export async function exportApis(apiIds: number[], format: ExportFormat): Promis
 		}
 
 		// Parse the filename from Content-Disposition, tolerating both
-		// quoted ("name.ext") and unquoted (name.ext) forms.
+		// quoted ("name.ext") and unquoted (name.ext) forms; when the
+		// header is missing, fall back to a format-aware generic name
+		// (only html exports are not JSON).
 		const disposition = response.headers.get('Content-Disposition') || ''
 		const match = disposition.match(/filename="?([^";]+)"?/)
-		const filename = match ? match[1] : 'knot-export'
+		const ext = format === 'html' ? 'html' : 'json'
+		const filename = match ? match[1] : `knot-export.${ext}`
 
 		const blob = await response.blob()
 		return { blob, filename }

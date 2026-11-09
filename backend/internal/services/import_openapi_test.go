@@ -842,8 +842,9 @@ func TestJSONSchemaToNodes(t *testing.T) {
 
 // TestParseOpenAPIDocument_SchemaShapes covers the remaining schema
 // conversion shapes: array items schemas (object elements and empty items),
-// the type inference fallbacks (properties without a type read as object,
-// unknown types degrade to string) and malformed path entries.
+// the type mapping ("integer" narrows to "number") and the type inference
+// fallbacks (properties without a type read as object, unknown types
+// degrade to string) and malformed path entries.
 func TestParseOpenAPIDocument_SchemaShapes(t *testing.T) {
 	// Arrange - one operation whose request schema exercises every shape,
 	// plus a path entry that is not an object at all
@@ -862,7 +863,8 @@ func TestParseOpenAPIDocument_SchemaShapes(t *testing.T) {
 						}, "required": ["label"]}},
 						"count": {"type": "integer"},
 						"flags": {"type": "array", "items": {}},
-						"meta": {"properties": {"k": {"type": "string"}}}
+						"meta": {"properties": {"k": {"type": "string"}}},
+						"weird": {"type": "opaque"}
 					}
 				}}}
 			}}}
@@ -885,8 +887,8 @@ func TestParseOpenAPIDocument_SchemaShapes(t *testing.T) {
 
 	// Assert - request nodes in sorted-key order
 	request := findPlanAPI(t, plan, "/things").Request
-	if len(request) != 4 {
-		t.Fatalf("Expected 4 request nodes, got %+v", request)
+	if len(request) != 5 {
+		t.Fatalf("Expected 5 request nodes, got %+v", request)
 	}
 	// Array with an object items schema: one child per element field, sorted.
 	assertNode(t, request[0], "badges", "array", false, 0, nil)
@@ -895,8 +897,8 @@ func TestParseOpenAPIDocument_SchemaShapes(t *testing.T) {
 	}
 	assertNode(t, request[0].Children[0], "label", "string", true, 0, nil)
 	assertNode(t, request[0].Children[1], "level", "number", false, 1, nil)
-	// Unknown schema types degrade to string leaves.
-	assertNode(t, request[1], "count", "string", false, 1, nil)
+	// A JSON Schema "integer" property imports as the numeric ParamNode type.
+	assertNode(t, request[1], "count", "number", false, 1, nil)
 	// An empty items schema contributes no children.
 	assertNode(t, request[2], "flags", "array", false, 2, nil)
 	if len(request[2].Children) != 0 {
@@ -908,4 +910,6 @@ func TestParseOpenAPIDocument_SchemaShapes(t *testing.T) {
 		t.Fatalf("Expected meta to have 1 child, got %+v", request[3].Children)
 	}
 	assertNode(t, request[3].Children[0], "k", "string", false, 0, nil)
+	// Unknown schema types degrade to string leaves.
+	assertNode(t, request[4], "weird", "string", false, 4, nil)
 }

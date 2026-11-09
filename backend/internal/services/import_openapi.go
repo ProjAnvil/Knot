@@ -343,13 +343,16 @@ func openapiWarnDepth(warnings *[]string) {
 }
 
 // openapiSchemaNodeType maps a schema to its ParamNode type: recognized
-// JSON Schema types pass through; a schema without "type" but with
+// JSON Schema types pass through, with "integer" narrowing to "number" (the
+// only numeric type ParamNode has); a schema without "type" but with
 // "properties" reads as an object; anything else degrades to "string",
 // mirroring the exporter's unknown-type degradation.
 func openapiSchemaNodeType(schema map[string]interface{}) string {
 	switch t := openapiStringValue(schema["type"]); t {
 	case "string", "number", "boolean", "object", "array":
 		return t
+	case "integer":
+		return "number"
 	}
 	if openapiMapValue(schema["properties"]) != nil {
 		return "object"
