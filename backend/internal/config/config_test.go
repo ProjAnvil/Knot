@@ -750,3 +750,66 @@ func TestGivenNoEnvOverrides_whenLoadConfig_thenDefaultsUnchanged(t *testing.T) 
 		t.Errorf("expected empty PostgresURL, got '%s'", cfg.PostgresURL)
 	}
 }
+
+// redirectUserDataDir points the Knot user data dir at a fresh temp directory
+// so LoadConfig creates its default config file there instead of touching the
+// developer's real ~/.knot directory.
+func redirectUserDataDir(t *testing.T) {
+	t.Helper()
+	resetViper()
+	tempDir := t.TempDir()
+	if runtime.GOOS == "windows" {
+		t.Setenv("LOCALAPPDATA", tempDir)
+	} else {
+		t.Setenv("HOME", tempDir)
+	}
+}
+
+// TestLoadConfig_PortEnvOverride tests the KNOT_PORT environment variable
+// override. A valid integer overrides the port without being persisted to the
+// config file; an unset variable keeps the default; an invalid value makes
+// LoadConfig return a descriptive error. The PORT variable honored by the
+// serve command is intentionally not set here: this test covers only the
+// config package.
+func TestLoadConfig_PortEnvOverride(t *testing.T) {
+	// KNOT_PORT set to a valid integer overrides the port.
+	redirectUserDataDir(t)
+	t.Setenv("KNOT_PORT", "4321")
+
+	cfg, err := LoadConfig()
+	if err != nil {
+		t.Fatalf("expected no error loading config with KNOT_PORT set, got %v", err)
+	}
+	if cfg.Port != 4321 {
+		t.Errorf("expected port 4321 from KNOT_PORT override, got %d", cfg.Port)
+	}
+
+	t.Run("UnsetKNOT_PORTKeepsDefault", func(t *testing.T) {
+		redirectUserDataDir(t)
+		// Defensively clear KNOT_PORT so a developer machine that has it set
+		// does not break this subtest.
+		t.Setenv("KNOT_PORT", "")
+		os.Unsetenv("KNOT_PORT")
+
+		cfg, err := LoadConfig()
+		if err != nil {
+			t.Fatalf("expected no error loading config without KNOT_PORT, got %v", err)
+		}
+		if cfg.Port != 3000 {
+			t.Errorf("expected default port 3000 when KNOT_PORT is unset, got %d", cfg.Port)
+		}
+	})
+
+	t.Run("InvalidKNOT_PORTReturnsError", func(t *testing.T) {
+		redirectUserDataDir(t)
+		t.Setenv("KNOT_PORT", "abc")
+
+		_, err := LoadConfig()
+		if err == nil {
+			t.Fatal("expected error for invalid KNOT_PORT value, got nil")
+		}
+		if !strings.Contains(err.Error(), "KNOT_PORT") {
+			t.Errorf("expected error to mention KNOT_PORT, got: %v", err)
+		}
+	})
+}
