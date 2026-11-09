@@ -6,6 +6,7 @@ import (
 
 	"github.com/ProjAnvil/knot/backend/internal/config"
 	models "github.com/ProjAnvil/knot/models"
+	"github.com/ProjAnvil/knot/models/gormbind"
 	"github.com/glebarez/sqlite"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
@@ -64,8 +65,8 @@ func InitDatabase(cfg *config.Config) (*gorm.DB, error) {
 	tableExists := migrator.HasTable(&models.Group{})
 
 	if !tableExists {
-		// Tables don't exist, run full migration
-		if err := db.AutoMigrate(&models.Group{}, &models.API{}, &models.Parameter{}); err != nil {
+		// Tables don't exist, run full migration over the canonical model list
+		if err := db.AutoMigrate(gormbind.MigrateModels()...); err != nil {
 			return nil, fmt.Errorf("failed to run auto-migration: %w", err)
 		}
 	} else {
