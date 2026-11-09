@@ -1,6 +1,6 @@
 module github.com/ProjAnvil/knot/tools
 
-go 1.25.4
+go 1.25.5
 
 // Permanent replace, same ruling as backend/go.mod: in-repo builds resolve the
 // sibling models module directly, while external consumers resolve the

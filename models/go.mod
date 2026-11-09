@@ -1,6 +1,6 @@
 module github.com/ProjAnvil/knot/models
 
-go 1.25.4
+go 1.25.5
 
 require (
 	github.com/glebarez/sqlite v1.11.0

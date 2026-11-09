@@ -1,6 +1,6 @@
 module github.com/ProjAnvil/knot/backend
 
-go 1.25.4
+go 1.25.5
 
 require (
 	github.com/ProjAnvil/knot/models v1.0.0
