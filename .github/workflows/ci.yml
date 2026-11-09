@@ -79,6 +79,7 @@ jobs:
 
           import (
             "fmt"
+            "os"
 
             "github.com/ProjAnvil/knot/models"
             "github.com/ProjAnvil/knot/models/gormbind"
@@ -86,8 +87,13 @@ jobs:
 
           func main() {
             g := models.Group{Name: "smoke"}
+            n := len(gormbind.MigrateModels())
             fmt.Printf("group=%q valid=%v format=%q migrations=%d\n",
-              g.Name, models.IsValidMethod("GET"), models.WireFormat, len(gormbind.MigrateModels()))
+              g.Name, models.IsValidMethod("GET"), models.WireFormat, n)
+            if n != 3 {
+              fmt.Printf("unexpected migration count: %d\n", n)
+              os.Exit(1)
+            }
           }
           EOF
           # tidy is REQUIRED: a replace without a require cannot build.
