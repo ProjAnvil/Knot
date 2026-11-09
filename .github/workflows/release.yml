@@ -83,49 +83,77 @@ jobs:
             release/knot-mcp-windows.exe
             release/checksums.txt
           body: |
-            ## Knot Release ${{ github.ref_name }}
+            ## Knot ${{ github.ref_name }}
 
-            ### 📦 下载 / Download
+            ## 🚀 Highlights
 
-            #### CLI 版本（包含前端界面）/ CLI Version (with embedded frontend)
-            - **macOS (Apple Silicon)**: `knot-macos-arm64`
-            - **macOS (Intel)**: `knot-macos-amd64`
-            - **Linux (AMD64)**: `knot-linux`
-            - **Windows (AMD64)**: `knot-windows.exe`
+            - **Multi-format export** — export APIs as Knot JSON, OpenAPI 3.1, and Postman Collection v2.1 alongside the existing HTML documentation
+            - **Import with auto-detection** — import Knot JSON, OpenAPI 3.1, and Postman v2.1 files with automatic format detection and a preview-before-confirm step
+            - **Full E2E coverage** — export and import flows are now covered end-to-end by an automated Playwright suite
 
-            #### Server 版本（仅后端API）/ Server Version (API only)
-            - **macOS (Apple Silicon)**: `knot-server-macos-arm64`
-            - **macOS (Intel)**: `knot-server-macos-amd64`
-            - **Linux (AMD64)**: `knot-server-linux`
-            - **Windows (AMD64)**: `knot-server-windows.exe`
+            ## What's Changed
 
-            #### MCP Server 版本（AI 集成）/ MCP Server Version (AI Integration)
-            - **macOS (Apple Silicon)**: `knot-mcp-macos-arm64`
-            - **macOS (Intel)**: `knot-mcp-macos-amd64`
-            - **Linux (AMD64)**: `knot-mcp-linux`
-            - **Windows (AMD64)**: `knot-mcp-windows.exe`
+            ### Features
+            * Export builders for Knot JSON v1, OpenAPI 3.1, and Postman Collection v2.1, wired into the export endpoint alongside HTML
+            * Import pipeline with automatic format detection (Knot JSON / OpenAPI 3.x / Postman v2.1), dry-run preview via `POST /api/import`, and transactional apply with merge semantics
+            * Export dialog format picker and import dialog with preview-before-confirm in the frontend
+            * `KNOT_PORT` environment variable override for the server port
 
-            ### 📋 安装说明 / Installation
+            ### Tests
+            * Playwright E2E harness plus export/import round-trip, multi-format export, and Postman/OpenAPI import specs
+            * Coverage gates for handler import/export coverage and expanded ImportDocument tests
+
+            ### CI & Release
+            * New test and E2E workflow with coverage reporting
+            * Release notes switched to an English template (highlights, grouped changelog, downloads table)
+
+            ## New Contributors
+
+            * Welcome to new contributors (if any)!
+
+            ## Full Changelog
+
+            https://github.com/ProjAnvil/knot/compare/v0.5.0...${{ github.ref_name }}
+
+            ## 📦 Downloads
+
+            | Component | Platform | Asset |
+            | --- | --- | --- |
+            | CLI (with embedded frontend) | macOS (Apple Silicon) | `knot-macos-arm64` |
+            | CLI (with embedded frontend) | macOS (Intel) | `knot-macos-amd64` |
+            | CLI (with embedded frontend) | Linux (AMD64) | `knot-linux` |
+            | CLI (with embedded frontend) | Windows (AMD64) | `knot-windows.exe` |
+            | Server (API only) | macOS (Apple Silicon) | `knot-server-macos-arm64` |
+            | Server (API only) | macOS (Intel) | `knot-server-macos-amd64` |
+            | Server (API only) | Linux (AMD64) | `knot-server-linux` |
+            | Server (API only) | Windows (AMD64) | `knot-server-windows.exe` |
+            | MCP Server (AI integration) | macOS (Apple Silicon) | `knot-mcp-macos-arm64` |
+            | MCP Server (AI integration) | macOS (Intel) | `knot-mcp-macos-amd64` |
+            | MCP Server (AI integration) | Linux (AMD64) | `knot-mcp-linux` |
+            | MCP Server (AI integration) | Windows (AMD64) | `knot-mcp-windows.exe` |
+            | All | Checksums | `checksums.txt` |
+
+            Verify downloads with `checksums.txt` (sha256):
 
             ```bash
-            # macOS/Linux - 下载后添加执行权限
-            chmod +x knot-*
-
-            # 移动到系统路径（可选）
-            sudo mv knot-macos-arm64 /usr/local/bin/knot
-
-            # MCP Server - 配置 Claude Desktop
-            # 1. 下载对应平台的 knot-mcp 二进制
-            # 2. 添加执行权限: chmod +x knot-mcp-*
-            # 3. 在 Claude Desktop 配置中添加（参考 mcp-server/README.md）
+            sha256sum -c checksums.txt      # Linux
+            shasum -a 256 -c checksums.txt  # macOS
             ```
 
-            ### ✅ 校验和 / Checksums
-            请查看 `checksums.txt` 文件验证下载的完整性。
+            ### Installation
 
-            ---
+            ```bash
+            # macOS/Linux - make the downloaded binary executable
+            chmod +x knot-*
 
-            **完整文档**: https://github.com/ProjAnvil/knot
+            # Move it into your PATH (optional)
+            sudo mv knot-macos-arm64 /usr/local/bin/knot
+
+            # MCP Server - configure Claude Desktop
+            # 1. Download the knot-mcp binary for your platform
+            # 2. Make it executable: chmod +x knot-mcp-*
+            # 3. Add it to your Claude Desktop config (see mcp-server/README.md)
+            ```
           draft: false
           prerelease: false
         env:
