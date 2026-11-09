@@ -17,7 +17,7 @@
 - Root `models` package imports **stdlib only** (GORM stays as inert struct tags); `gorm.io/gorm` is imported only in `models/gormbind` (module `go.mod` will list gorm + test-only sqlite — consumers of the root package don't download them, thanks to module graph pruning).
 - No JSON field-name or type renames — relocation, not redesign.
 - `go.work` must `use` `./backend ./models ./tools ./mcp-server` (release.yml builds mcp-server under the workspace).
-- Test names follow existing conventions; run Go via `cd backend && go test ./...` etc. (workspace mode); never commit a `replace` for the models module in `backend/go.mod`.
+- Test names follow existing conventions; run Go via `cd backend && go test ./...` etc. (workspace mode). RULING (Task 1, empirically verified): backend/go.mod carries a PERMANENT dev-time `replace github.com/ProjAnvil/knot/models => ../models` — an unpublished require is unresolvable in module graph resolution even under go.work once any proxy dep exists; the replace is consumer-inert and keeps Docker/CI/tag builds working.
 - Coverage: backend Makefile keeps its gate but its pattern must stop matching moved-out functions (T2); the models module gets its own `make test-coverage` gate (T3/T5).
 - Work on branch `feat/models-library`.
 
@@ -119,7 +119,7 @@ func AutoMigrate(db *gorm.DB) error           // db.AutoMigrate(MigrateModels().
 
 **Interfaces:**
 - New `models` job (runs with the other three): checkout; setup-go (`go-version-file: models/go.mod`; note GOTOOLCHAIN=auto may download the go.work toolchain version — acceptable); `cd models && go build ./... && go test ./...`; `make test-coverage` in `models/` (gate); drift lock FROM REPO ROOT (not models/): `go run ./tools/cmd/gen-schema && go run ./tools/cmd/gen-ts && git diff --exit-code -- models/schema models/ts`; consumption smoke: `SMOKE=$(mktemp -d) && cd $SMOKE && go mod init smoke && go mod edit -replace github.com/ProjAnvil/knot/models=$GITHUB_WORKSPACE/models`, write `main.go` importing `models` (Group literal + `models.IsValidMethod("GET")`) and `models/gormbind` (`len(gormbind.MigrateModels()) == 3`), then `GOWORK=off go mod tidy && GOWORK=off go build ./...` (tidy is REQUIRED — a replace without a require yields "no required module provides package"); proves the module graph is consumable without the workspace.
-- Existing `backend` job stays workspace-based; `GOWORK=off` builds are expected to fail pre-tag — do NOT add such a step; add a comment in ci.yml noting the §10.5 bootstrap handles it.
+- Existing `backend` job stays workspace-based; `GOWORK=off go build ./...` in backend WORKS now (committed replace resolves ../models) — the ci.yml comment should state the replace is what makes module-mode builds possible pre-tag.
 - [ ] **Step 1: Write ci.yml changes; YAML-validate.**
 - [ ] **Step 2: Verify locally**: replicate the models job steps in a shell script run (all pass, incl. smoke with temp dir + replace + tidy + GOWORK=off).
 - [ ] **Step 3: Commit** `ci: add models module job with drift lock and consumption smoke`
@@ -152,6 +152,6 @@ func AutoMigrate(db *gorm.DB) error           // db.AutoMigrate(MigrateModels().
 2. `git tag models/v1.0.0 && git push origin models/v1.0.0`.
 3. External smoke OUTSIDE the repo: temp module, `go get github.com/ProjAnvil/knot/models@v1.0.0`, compile Group + gormbind usage (records the real publish works).
 4. `gh release create models/v1.0.0 --latest=false --title "models v1.0.0" --notes-file <short English notes>`.
-5. Bootstrap go.sum: `cd backend && GOWORK=off go mod tidy` (resolves the published tag) → commit fixup `chore: pin models v1.0.0 in backend go.sum` → verify `GOWORK=off go build ./...`.
-6. `git tag v0.7.0` ON THE FIXUP COMMIT → push → `release.yml` builds; `gh release edit v0.7.0 --notes-file <English template, Full Changelog base v0.6.0>`.
+5. (MOOT per Task-1 ruling: the committed replace resolves the sibling locally; directory replaces need no go.sum entries. Only if the replace is ever dropped does this bootstrap revive.)
+6. `git tag v0.7.0` → push → `release.yml` builds; `gh release edit v0.7.0 --notes-file <English template, Full Changelog base v0.6.0>`.
 7. Verify: `gh release view v0.7.0 --json assets` (13 assets), Latest badge on v0.7.0 not the models release.
