@@ -148,6 +148,40 @@ func TestImportDocument(t *testing.T) {
 		assert.Equal(t, int64(0), params)
 	})
 
+	t.Run("givenUpperCaseDryRun_whenImport_thenNoWrites", func(t *testing.T) {
+		// Arrange - a non-lowercase truthy dryRun value must still be treated
+		// as a preview request, not fall through to a real import.
+		db := setupTestDB(t)
+		app := setupImportTestApp(db)
+
+		// Act
+		resp, err := app.Test(postImportRequest(t, knotImportFixture(), "True"))
+		require.NoError(t, err)
+
+		// Assert
+		assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+
+		var body struct {
+			Success bool               `json:"success"`
+			Data    importResponseData `json:"data"`
+		}
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+
+		assert.True(t, body.Success)
+		assert.Equal(t, 1, body.Data.GroupsCreated)
+		assert.Equal(t, 1, body.Data.APIsImported)
+		assert.Equal(t, 3, body.Data.ParametersImported)
+
+		// The upper-case spelling must not write any rows.
+		var groups, apis, params int64
+		db.Model(&models.Group{}).Count(&groups)
+		db.Model(&models.API{}).Count(&apis)
+		db.Model(&models.Parameter{}).Count(&params)
+		assert.Equal(t, int64(0), groups)
+		assert.Equal(t, int64(0), apis)
+		assert.Equal(t, int64(0), params)
+	})
+
 	t.Run("givenKnotFile_whenImport_thenPersistsRows", func(t *testing.T) {
 		// Arrange
 		db := setupTestDB(t)
