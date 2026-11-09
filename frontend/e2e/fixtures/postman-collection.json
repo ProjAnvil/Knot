@@ -1,0 +1,71 @@
+{
+  "info": {
+    "name": "E2E Postman Collection",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "List Users",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/users"
+          }
+        },
+        {
+          "name": "Create User",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/users"
+            },
+            "description": {
+              "content": "Creates a user from a raw JSON body."
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\": \"example\", \"age\": 0}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Admin",
+          "item": [
+            {
+              "name": "Delete Admin",
+              "request": {
+                "method": "DELETE",
+                "url": {
+                  "raw": "{{baseUrl}}/admins/1"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/health"
+      }
+    },
+    {
+      "name": "Submit Job",
+      "x-knot-type": "rpc",
+      "request": {
+        "url": {
+          "raw": "{{baseUrl}}/jobs/submit"
+        }
+      }
+    }
+  ]
+}
