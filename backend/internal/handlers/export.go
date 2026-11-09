@@ -1,6 +1,10 @@
 package handlers
 
 import (
+	"encoding/json"
+	"fmt"
+	"time"
+
 	"github.com/ProjAnvil/knot/backend/internal/models"
 	"github.com/ProjAnvil/knot/backend/internal/services"
 	"github.com/ProjAnvil/knot/backend/pkg/response"
@@ -9,11 +13,13 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-// ExportAPIs exports selected APIs to HTML
+// ExportAPIs exports selected APIs in the requested format:
+// "html" (default), "json" (Knot JSON v1), "openapi" or "postman"
 func ExportAPIs(db *gorm.DB) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		var body struct {
 			APIIDs []uint `json:"apiIds"`
+			Format string `json:"format"`
 		}
 
 		if err := c.BodyParser(&body); err != nil {
@@ -47,9 +53,9 @@ func ExportAPIs(db *gorm.DB) fiber.Handler {
 			}
 		}
 
-		groupMap := make(map[uint]string)
+		groupMap := make(map[uint]models.Group)
 		for _, g := range groups {
-			groupMap[g.ID] = g.Name
+			groupMap[g.ID] = g
 		}
 
 		// Fetch parameters for each API
@@ -71,7 +77,8 @@ func ExportAPIs(db *gorm.DB) fiber.Handler {
 				}
 			}
 
-			groupName := groupMap[api.GroupID]
+			group := groupMap[api.GroupID]
+			groupName := group.Name
 			if groupName == "" {
 				groupName = "Ungrouped"
 			}
@@ -79,21 +86,62 @@ func ExportAPIs(db *gorm.DB) fiber.Handler {
 			apisWithParams = append(apisWithParams, services.APIWithParams{
 				API:                api,
 				GroupName:          groupName,
+				GroupOrder:         group.Order,
 				RequestParameters:  requestParams,
 				ResponseParameters: responseParams,
 			})
 		}
 
-		// Get locale from cookie or default to "zh"
-		locale := c.Cookies("locale", "zh")
+		now := time.Now()
 
-		// Generate HTML
-		html := services.GenerateHTML(apisWithParams, locale)
+		switch body.Format {
+		case "", "html":
+			// Get locale from cookie or default to "zh"
+			locale := c.Cookies("locale", "zh")
 
-		// Set response headers
-		c.Set("Content-Type", "text/html; charset=utf-8")
-		c.Set("Content-Disposition", "attachment; filename=\"api-docs.html\"")
+			// Generate HTML
+			html := services.GenerateHTML(apisWithParams, locale)
 
-		return c.SendString(html)
+			// Set response headers
+			c.Set("Content-Type", "text/html; charset=utf-8")
+			c.Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", "api-docs.html"))
+
+			return c.SendString(html)
+		case "json":
+			data, err := json.Marshal(services.BuildKnotDocument(apisWithParams, now))
+			if err != nil {
+				return response.InternalError(c, "Failed to encode export document")
+			}
+
+			filename := fmt.Sprintf("knot-export-%d.json", now.Unix())
+			c.Set("Content-Type", "application/json")
+			c.Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+
+			return c.Send(data)
+		case "openapi":
+			data, err := json.Marshal(services.BuildOpenAPIDocument(apisWithParams))
+			if err != nil {
+				return response.InternalError(c, "Failed to encode export document")
+			}
+
+			filename := fmt.Sprintf("openapi-%d.json", now.Unix())
+			c.Set("Content-Type", "application/json")
+			c.Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+
+			return c.Send(data)
+		case "postman":
+			data, err := json.Marshal(services.BuildPostmanCollection(apisWithParams, now))
+			if err != nil {
+				return response.InternalError(c, "Failed to encode export document")
+			}
+
+			filename := fmt.Sprintf("postman-%d.json", now.Unix())
+			c.Set("Content-Type", "application/json")
+			c.Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+
+			return c.Send(data)
+		default:
+			return response.BadRequest(c, "Unsupported export format")
+		}
 	}
 }
