@@ -4,7 +4,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/ProjAnvil/knot/backend/internal/models"
+	models "github.com/ProjAnvil/knot/models"
 )
 
 // OpenAPIDocument is the root object of an OpenAPI 3.1 document built by

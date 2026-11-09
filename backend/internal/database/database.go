@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/ProjAnvil/knot/backend/internal/config"
-	"github.com/ProjAnvil/knot/backend/internal/models"
+	models "github.com/ProjAnvil/knot/models"
 	"github.com/glebarez/sqlite"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"

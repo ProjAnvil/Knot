@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ProjAnvil/knot/backend/internal/models"
+	models "github.com/ProjAnvil/knot/models"
 )
 
 // TestParseOpenAPIDocument covers the OpenAPI 3.x importer per spec §8.3:

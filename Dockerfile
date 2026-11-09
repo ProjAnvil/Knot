@@ -11,7 +11,11 @@ RUN bun run build
 # Stage 2: build backend with embedded frontend
 FROM golang:1.25-alpine AS backend
 WORKDIR /app/backend
+# Build without the workspace: backend's replace directive points the models
+# dependency at the sibling in-repo module copied below.
+ENV GOWORK=off
 COPY backend/go.mod backend/go.sum ./
+COPY models/ ../models/
 RUN go mod download
 COPY backend/ ./
 # Overwrite any stale prebuilt assets with the fresh frontend build

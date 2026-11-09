@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/ProjAnvil/knot/backend/internal/models"
 	"github.com/ProjAnvil/knot/backend/pkg/response"
+	models "github.com/ProjAnvil/knot/models"
 	"github.com/glebarez/sqlite"
 	"github.com/gofiber/fiber/v2"
 	"github.com/stretchr/testify/assert"

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ProjAnvil/knot/backend/internal/models"
+	models "github.com/ProjAnvil/knot/models"
 )
 
 // uuidV4Pattern matches an RFC 4122 version 4 UUID in its canonical

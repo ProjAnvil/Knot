@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ProjAnvil/knot/backend/internal/models"
 	"github.com/ProjAnvil/knot/backend/internal/services"
 	"github.com/ProjAnvil/knot/backend/pkg/response"
+	models "github.com/ProjAnvil/knot/models"
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"

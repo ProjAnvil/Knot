@@ -3,7 +3,7 @@ package services
 import (
 	"sort"
 
-	"github.com/ProjAnvil/knot/backend/internal/models"
+	models "github.com/ProjAnvil/knot/models"
 )
 
 // ParamNode is a portable representation of a parameter tree node used by

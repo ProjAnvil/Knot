@@ -3,6 +3,7 @@ module github.com/ProjAnvil/knot/backend
 go 1.25.4
 
 require (
+	github.com/ProjAnvil/knot/models v1.0.0
 	github.com/glebarez/sqlite v1.11.0
 	github.com/gofiber/fiber/v2 v2.52.10
 	github.com/spf13/cobra v1.10.1
@@ -15,6 +16,10 @@ require (
 	gorm.io/driver/postgres v1.6.0
 	gorm.io/gorm v1.31.1
 )
+
+// Dev-time redirect to the in-repo models module so builds work before the
+// v1.0.0 tag is published; ignored by consumers once the tag exists.
+replace github.com/ProjAnvil/knot/models => ../models
 
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect

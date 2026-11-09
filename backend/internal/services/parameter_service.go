@@ -3,7 +3,7 @@ package services
 import (
 	"encoding/json"
 
-	"github.com/ProjAnvil/knot/backend/internal/models"
+	models "github.com/ProjAnvil/knot/models"
 	"gorm.io/gorm"
 )
 

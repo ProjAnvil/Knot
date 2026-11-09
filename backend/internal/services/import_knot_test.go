@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ProjAnvil/knot/backend/internal/models"
+	models "github.com/ProjAnvil/knot/models"
 )
 
 // TestParseKnotJSON_RoundTrip parses a document built by the real
