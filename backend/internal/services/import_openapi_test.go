@@ -668,13 +668,13 @@ func TestParseOpenAPIDocument(t *testing.T) {
 		if del.Type != "HTTP" || del.Method != "DELETE" {
 			t.Errorf("Expected HTTP DELETE, got %+v", del)
 		}
-		assertParamNodesEqual(t, del.Response, TreeFromParams(apis[2].ResponseParameters), "response")
+		assertParamNodesEqual(t, del.Response, models.TreeFromParams(apis[2].ResponseParameters), "response")
 
 		list := plan.Groups[1].APIs[0]
 		if list.Type != "HTTP" || list.Method != "GET" {
 			t.Errorf("Expected HTTP GET, got %+v", list)
 		}
-		assertParamNodesEqual(t, list.Request, TreeFromParams(apis[0].RequestParameters), "request")
+		assertParamNodesEqual(t, list.Request, models.TreeFromParams(apis[0].RequestParameters), "request")
 		if list.Note != nil {
 			t.Errorf("Expected no note for List users, got %q", *list.Note)
 		}
@@ -726,7 +726,7 @@ func TestParseOpenAPIDocument(t *testing.T) {
 
 // findPlanAPI returns the first API whose endpoint matches, failing the
 // test when none exists.
-func findPlanAPI(t *testing.T, plan *ImportPlan, endpoint string) ImportAPI {
+func findPlanAPI(t *testing.T, plan *models.ImportPlan, endpoint string) models.ImportAPI {
 	t.Helper()
 	for _, api := range allPlanAPIs(plan) {
 		if api.Endpoint == endpoint {
@@ -734,20 +734,20 @@ func findPlanAPI(t *testing.T, plan *ImportPlan, endpoint string) ImportAPI {
 		}
 	}
 	t.Fatalf("No API with endpoint %q in plan: %+v", endpoint, plan.Groups)
-	return ImportAPI{}
+	return models.ImportAPI{}
 }
 
 // allPlanAPIs flattens a plan into its APIs, group by group.
-func allPlanAPIs(plan *ImportPlan) []ImportAPI {
-	var apis []ImportAPI
+func allPlanAPIs(plan *models.ImportPlan) []models.ImportAPI {
+	var apis []models.ImportAPI
 	for _, group := range plan.Groups {
 		apis = append(apis, group.APIs...)
 	}
 	return apis
 }
 
-// assertNode checks the scalar fields of one ParamNode.
-func assertNode(t *testing.T, node ParamNode, name, nodeType string, required bool, order int, description *string) {
+// assertNode checks the scalar fields of one models.ParamNode.
+func assertNode(t *testing.T, node models.ParamNode, name, nodeType string, required bool, order int, description *string) {
 	t.Helper()
 	if node.Name != name {
 		t.Errorf("Expected node name %q, got %q", name, node.Name)
@@ -897,7 +897,7 @@ func TestParseOpenAPIDocument_SchemaShapes(t *testing.T) {
 	}
 	assertNode(t, request[0].Children[0], "label", "string", true, 0, nil)
 	assertNode(t, request[0].Children[1], "level", "number", false, 1, nil)
-	// A JSON Schema "integer" property imports as the numeric ParamNode type.
+	// A JSON Schema "integer" property imports as the numeric models.ParamNode type.
 	assertNode(t, request[1], "count", "number", false, 1, nil)
 	// An empty items schema contributes no children.
 	assertNode(t, request[2], "flags", "array", false, 2, nil)

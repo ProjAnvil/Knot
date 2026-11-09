@@ -1,17 +1,15 @@
-package services
+package models
 
 import (
 	"encoding/json"
 	"testing"
-
-	models "github.com/ProjAnvil/knot/models"
 )
 
 // TestTreeFromParams covers converting flat ordered parameter rows into a nested ParamNode tree.
 func TestTreeFromParams(t *testing.T) {
 	t.Run("GivenEmptyList_whenConvert_thenEmptyResult", func(t *testing.T) {
 		// Arrange
-		params := []models.Parameter{}
+		params := []Parameter{}
 
 		// Act
 		result := TreeFromParams(params)
@@ -24,7 +22,7 @@ func TestTreeFromParams(t *testing.T) {
 
 	t.Run("GivenFlatRows_whenConvert_thenRootsOnly", func(t *testing.T) {
 		// Arrange
-		params := []models.Parameter{
+		params := []Parameter{
 			{ID: 1, Name: "page", Type: "number", Required: false, Order: 0, ParentID: nil},
 			{ID: 2, Name: "keyword", Type: "string", Required: true, Order: 1, ParentID: nil},
 		}
@@ -51,7 +49,7 @@ func TestTreeFromParams(t *testing.T) {
 		userID := uint(1)
 		addressID := uint(4)
 		desc := "User container"
-		params := []models.Parameter{
+		params := []Parameter{
 			{ID: 1, Name: "user", Type: "object", Required: true, Description: &desc, Order: 0, ParentID: nil},
 			{ID: 2, Name: "name", Type: "string", Required: true, Order: 0, ParentID: &userID},
 			{ID: 3, Name: "age", Type: "number", Required: false, Order: 1, ParentID: &userID},
@@ -94,7 +92,7 @@ func TestTreeFromParams(t *testing.T) {
 	t.Run("GivenMultipleRootsWithChildren_whenConvert_thenEachTreeBuilt", func(t *testing.T) {
 		// Arrange
 		filterID := uint(2)
-		params := []models.Parameter{
+		params := []Parameter{
 			{ID: 1, Name: "sort", Type: "string", Order: 0, ParentID: nil},
 			{ID: 2, Name: "filter", Type: "object", Order: 1, ParentID: nil},
 			{ID: 3, Name: "field", Type: "string", Order: 0, ParentID: &filterID},

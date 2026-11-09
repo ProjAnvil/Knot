@@ -7,19 +7,19 @@ import (
 	models "github.com/ProjAnvil/knot/models"
 )
 
-// TestNodesToJSONSchema covers converting ParamNode forests into JSON Schema
+// TestNodesToJSONSchema covers converting models.ParamNode forests into JSON Schema
 // objects: object/array/leaf type mapping, required name lists, the
 // objectRequired gate, and description carrying.
 func TestNodesToJSONSchema(t *testing.T) {
 	filterDesc := "Filter criteria"
 	nameDesc := "User name"
-	nodes := []ParamNode{
+	nodes := []models.ParamNode{
 		{
 			Name:        "filter",
 			Type:        "object",
 			Description: &filterDesc,
 			Order:       0,
-			Children: []ParamNode{
+			Children: []models.ParamNode{
 				{Name: "name", Type: "string", Required: true, Description: &nameDesc, Order: 0},
 				{Name: "page", Type: "number", Order: 1},
 			},
@@ -28,7 +28,7 @@ func TestNodesToJSONSchema(t *testing.T) {
 			Name:  "tags",
 			Type:  "array",
 			Order: 1,
-			Children: []ParamNode{
+			Children: []models.ParamNode{
 				{Name: "item", Type: "string", Order: 0},
 			},
 		},
@@ -138,7 +138,7 @@ func TestNodesToJSONSchema(t *testing.T) {
 
 	t.Run("GivenNoRequiredNodes_whenToSchema_thenRequiredOmitted", func(t *testing.T) {
 		// Arrange
-		optional := []ParamNode{{Name: "q", Type: "string", Order: 0}}
+		optional := []models.ParamNode{{Name: "q", Type: "string", Order: 0}}
 
 		// Act
 		schema := NodesToJSONSchema(optional, true)
@@ -607,7 +607,7 @@ func TestBuildOpenAPIDocument_Verbs(t *testing.T) {
 func TestNodesToJSONSchema_ArrayItemShapes(t *testing.T) {
 	t.Run("GivenChildlessArray_whenToSchema_thenEmptyItemsSchema", func(t *testing.T) {
 		// Arrange
-		nodes := []ParamNode{{Name: "flags", Type: "array", Order: 0, Children: []ParamNode{}}}
+		nodes := []models.ParamNode{{Name: "flags", Type: "array", Order: 0, Children: []models.ParamNode{}}}
 
 		// Act
 		schema := NodesToJSONSchema(nodes, false)
@@ -632,11 +632,11 @@ func TestNodesToJSONSchema_ArrayItemShapes(t *testing.T) {
 
 	t.Run("GivenArrayWithFieldChildren_whenToSchema_thenObjectElementSchema", func(t *testing.T) {
 		// Arrange - element fields: id (required) and name
-		nodes := []ParamNode{{
+		nodes := []models.ParamNode{{
 			Name:  "items",
 			Type:  "array",
 			Order: 0,
-			Children: []ParamNode{
+			Children: []models.ParamNode{
 				{Name: "id", Type: "number", Required: true, Order: 0},
 				{Name: "name", Type: "string", Order: 1},
 			},

@@ -11,7 +11,7 @@ import (
 
 // TestParseKnotJSON_RoundTrip parses a document built by the real
 // BuildKnotDocument builder (not hand-written JSON) and checks the resulting
-// ImportPlan is its semantic inverse: groups, API fields, note pointers and
+// models.ImportPlan is its semantic inverse: groups, API fields, note pointers and
 // full parameter trees survive the marshal/parse cycle.
 func TestParseKnotJSON_RoundTrip(t *testing.T) {
 	t.Run("GivenBuiltDocument_whenMarshalAndParse_thenPlanMatches", func(t *testing.T) {
@@ -243,7 +243,7 @@ func TestParseKnotJSON_RoundTrip(t *testing.T) {
 // assertParamNodesEqual recursively compares two parameter trees node by
 // node: name, type, required flag, order, description pointer values and
 // children.
-func assertParamNodesEqual(t *testing.T, got, want []ParamNode, path string) {
+func assertParamNodesEqual(t *testing.T, got, want []models.ParamNode, path string) {
 	t.Helper()
 	if len(got) != len(want) {
 		t.Fatalf("%s: expected %d nodes, got %d", path, len(want), len(got))

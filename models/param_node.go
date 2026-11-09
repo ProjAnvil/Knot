@@ -1,13 +1,11 @@
-package services
+package models
 
 import (
 	"sort"
-
-	models "github.com/ProjAnvil/knot/models"
 )
 
 // ParamNode is a portable representation of a parameter tree node used by
-// multi-format export/import. It mirrors models.Parameter without persistence
+// multi-format export/import. It mirrors Parameter without persistence
 // or ORM concerns so it can be serialized to any exchange format.
 type ParamNode struct {
 	Name        string      `json:"name"`
@@ -22,7 +20,7 @@ type ParamNode struct {
 // and paramType) into a nested tree of ParamNode. Input row order is preserved
 // for both roots and siblings. Rows whose ParentID references an unknown
 // parameter are dropped, mirroring BuildParameterTree.
-func TreeFromParams(params []models.Parameter) []ParamNode {
+func TreeFromParams(params []Parameter) []ParamNode {
 	if len(params) == 0 {
 		return []ParamNode{}
 	}
