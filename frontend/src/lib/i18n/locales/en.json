@@ -137,7 +137,19 @@
 		"exporting": "Exporting...",
 		"exportHtml": "Export HTML",
 		"success": "Export successful",
-		"error": "Export failed"
+		"error": "Export failed",
+		"formatLabel": "Format",
+		"confirm": "Export",
+		"format": {
+			"html": "HTML",
+			"html.desc": "Styled, self-contained documentation page",
+			"json": "JSON",
+			"json.desc": "Knot backup with full data",
+			"openapi": "OpenAPI",
+			"openapi.desc": "OpenAPI 3.x specification",
+			"postman": "Postman",
+			"postman.desc": "Postman collection"
+		}
 	},
 	"createApi": {
 		"title": "Create New API",

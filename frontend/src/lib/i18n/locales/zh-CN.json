@@ -137,7 +137,19 @@
 		"exporting": "导出中...",
 		"exportHtml": "导出 HTML",
 		"success": "导出成功",
-		"error": "导出失败"
+		"error": "导出失败",
+		"formatLabel": "格式",
+		"confirm": "导出",
+		"format": {
+			"html": "HTML",
+			"html.desc": "带样式的独立文档页面",
+			"json": "JSON",
+			"json.desc": "包含完整数据的 Knot 备份",
+			"openapi": "OpenAPI",
+			"openapi.desc": "OpenAPI 3.x 规范",
+			"postman": "Postman",
+			"postman.desc": "Postman 集合"
+		}
 	},
 	"createApi": {
 		"title": "创建新 API",
