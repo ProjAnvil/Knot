@@ -151,6 +151,22 @@
 			"postman.desc": "Postman collection"
 		}
 	},
+	"import": {
+		"title": "Import",
+		"selectFile": "Select a file to import",
+		"detectedFormat": "Detected format",
+		"groupsCreated": "Groups created",
+		"groupsMerged": "Groups merged",
+		"apisImported": "APIs imported",
+		"parametersImported": "Parameters imported",
+		"warnings": "Warnings",
+		"confirm": "Import",
+		"cancel": "Cancel",
+		"importing": "Importing...",
+		"success": "Import successful",
+		"error": "Import failed",
+		"unsupportedFormat": "Unsupported file format. Supported formats: Knot JSON, Postman Collection, OpenAPI 3.x"
+	},
 	"createApi": {
 		"title": "Create New API",
 		"apiNameLabel": "API Name*",

@@ -13,6 +13,7 @@
   import RenameGroupDialog from './dialogs/RenameGroupDialog.svelte'
   import CreateApiDialog from './dialogs/CreateApiDialog.svelte'
   import ExportDialog from './dialogs/ExportDialog.svelte'
+  import ImportDialog from './dialogs/ImportDialog.svelte'
   import LanguageSwitcher from './LanguageSwitcher.svelte'
   import DropdownMenu from './ui/dropdown-menu.svelte'
   import Input from './ui/input.svelte'
@@ -363,6 +364,7 @@
         </div>
       </div>
       <ExportDialog {groups} />
+      <ImportDialog onImported={() => onDataChange?.()} />
     </div>
   </div>
 

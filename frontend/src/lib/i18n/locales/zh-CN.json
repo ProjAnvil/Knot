@@ -151,6 +151,22 @@
 			"postman.desc": "Postman 集合"
 		}
 	},
+	"import": {
+		"title": "导入",
+		"selectFile": "选择要导入的文件",
+		"detectedFormat": "检测到的格式",
+		"groupsCreated": "新建分组",
+		"groupsMerged": "合并分组",
+		"apisImported": "导入的 API",
+		"parametersImported": "导入的参数",
+		"warnings": "警告",
+		"confirm": "导入",
+		"cancel": "取消",
+		"importing": "导入中...",
+		"success": "导入成功",
+		"error": "导入失败",
+		"unsupportedFormat": "不支持的文件格式。支持的格式：Knot JSON、Postman 集合、OpenAPI 3.x"
+	},
 	"createApi": {
 		"title": "创建新 API",
 		"apiNameLabel": "API 名称*",
