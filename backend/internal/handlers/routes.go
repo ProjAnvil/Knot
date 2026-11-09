@@ -36,6 +36,9 @@ func SetupRoutes(app *fiber.App, db *gorm.DB) {
 	export := api.Group("/export")
 	export.Post("/", ExportAPIs(db))
 
+	// Import routes
+	api.Post("/import", ImportDocument(db))
+
 	// MCP Tools routes
 	mcpTools := api.Group("/mcp-tools")
 	mcpTools.Post("/", HandleMCPTools(db))
