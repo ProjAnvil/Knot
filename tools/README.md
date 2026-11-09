@@ -23,8 +23,17 @@ Post-processing applied by the generator:
   `properties.format.const = "knot"` and `properties.version.const = 1` —
   using the same `models.WireFormat` / `models.WireVersion` constants the
   export builder writes, so schema and code cannot disagree.
+- Properties backed by Go `*string` fields without `omitempty` (currently
+  `KnotExportAPI.note` and `ParamNode.description`) are widened to
+  `["string", "null"]`: the wire format always serializes such nil
+  pointers as `null`, and the reflection output alone would wrongly reject
+  Knot's own exports. The widening is derived by reflection over the same
+  types, so future nullable fields are picked up automatically; the
+  generator fails loudly if an expected property is missing.
 - All nested types are referenced locally via `#/$defs/<Name>` (the
-  reflector runs in anonymous mode; no per-type `$id`s).
+  reflector runs in anonymous mode; no per-type `$id`s). Because the
+  widening step re-encodes the document generically, object keys are
+  serialized in sorted order.
 
 ### TypeScript: `gen-ts`
 
@@ -53,6 +62,13 @@ Notes on the output:
   `API`, and `Parameter` have custom `MarshalJSON` methods that project
   `createdAt`/`updatedAt` as RFC 3339 strings; those runtime keys are not
   representable in the tag-derived declarations.
+- tygo renders pointer fields as optional properties (`note?: string`)
+  rather than `string | null`. For fields without `omitempty` (such as
+  `KnotExportAPI.note` and `ParamNode.description`) the wire format always
+  emits the key, with `null` for a nil pointer — the JSON Schema golden is
+  widened accordingly (`["string", "null"]`), but the TS golden keeps
+  tygo's optional rendering. This is inherent tygo behavior, not a bug in
+  the generator.
 
 ## Why the goldens are committed
 
