@@ -1,4 +1,4 @@
-.PHONY: build build-all clean run test deps fmt lint setup package package-all package-cli package-cli-all package-server package-server-all
+.PHONY: build build-all clean run test test-coverage deps fmt lint setup package package-all package-cli package-cli-all package-server package-server-all
 
 # Build flags for size optimization
 # -s: omit symbol table and debug info
@@ -48,6 +48,14 @@ clean:
 # Run tests
 test:
 	@go test -v ./...
+
+# Run tests with race detector and coverage, then enforce the 85% gate on
+# the export/import services (param_node, export_knot, export_openapi,
+# export_postman, import_*). Exits non-zero if any gated file is below 85.0%.
+test-coverage:
+	@go test ./... -race -covermode=atomic -coverprofile=coverage.out
+	@go tool cover -func=coverage.out
+	@go tool cover -func=coverage.out | grep -E '(param_node|export_knot|export_openapi|export_postman|import_)' | awk '{gsub(/%/,"",$$NF); if ($$NF+0 < 85.0) { print "COVERAGE GATE FAIL:", $$1, $$NF"%"; f=1 }} END { exit f }'
 
 # Install dependencies
 deps:

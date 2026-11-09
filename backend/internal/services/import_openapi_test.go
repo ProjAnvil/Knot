@@ -772,3 +772,140 @@ func assertNode(t *testing.T, node ParamNode, name, nodeType string, required bo
 func strPtr(s string) *string {
 	return &s
 }
+
+// TestJSONSchemaToNodes covers the direct conversion entry point: it
+// initializes the visited set when nil, and handles nil schemas, the depth
+// cap and property-less schemas without panicking (warnings are dropped by
+// this variant since it has no plan to record them on).
+func TestJSONSchemaToNodes(t *testing.T) {
+	t.Run("givenObjectSchemaAndNilVisited_whenConvert_thenSortedNodes", func(t *testing.T) {
+		// Arrange - map iteration order is random, so sorted-key order is
+		// what makes the result deterministic
+		schema := map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"b": map[string]interface{}{"type": "string"},
+				"a": map[string]interface{}{"type": "number"},
+			},
+		}
+
+		// Act - a nil visited set is initialized internally
+		nodes := JSONSchemaToNodes(schema, map[string]interface{}{}, nil, 0)
+
+		// Assert
+		if len(nodes) != 2 {
+			t.Fatalf("Expected 2 nodes, got %+v", nodes)
+		}
+		assertNode(t, nodes[0], "a", "number", false, 0, nil)
+		assertNode(t, nodes[1], "b", "string", false, 1, nil)
+	})
+
+	t.Run("givenNilSchema_whenConvert_thenNoNodes", func(t *testing.T) {
+		// Act
+		nodes := JSONSchemaToNodes(nil, nil, nil, 0)
+
+		// Assert
+		if len(nodes) != 0 {
+			t.Errorf("Expected no nodes for a nil schema, got %+v", nodes)
+		}
+	})
+
+	t.Run("givenSchemaWithoutProperties_whenConvert_thenNoNodes", func(t *testing.T) {
+		// Arrange
+		schema := map[string]interface{}{"type": "object"}
+
+		// Act
+		nodes := JSONSchemaToNodes(schema, nil, nil, 0)
+
+		// Assert
+		if len(nodes) != 0 {
+			t.Errorf("Expected no nodes without properties, got %+v", nodes)
+		}
+	})
+
+	t.Run("givenDepthBeyondCap_whenConvert_thenSubtreeSkipped", func(t *testing.T) {
+		// Arrange - starting past the depth cap skips the whole subtree
+		schema := map[string]interface{}{
+			"type":       "object",
+			"properties": map[string]interface{}{"a": map[string]interface{}{"type": "string"}},
+		}
+
+		// Act
+		nodes := JSONSchemaToNodes(schema, nil, nil, openapiMaxSchemaDepth+1)
+
+		// Assert
+		if len(nodes) != 0 {
+			t.Errorf("Expected the too-deep subtree to be skipped, got %+v", nodes)
+		}
+	})
+}
+
+// TestParseOpenAPIDocument_SchemaShapes covers the remaining schema
+// conversion shapes: array items schemas (object elements and empty items),
+// the type inference fallbacks (properties without a type read as object,
+// unknown types degrade to string) and malformed path entries.
+func TestParseOpenAPIDocument_SchemaShapes(t *testing.T) {
+	// Arrange - one operation whose request schema exercises every shape,
+	// plus a path entry that is not an object at all
+	data := []byte(`{
+		"openapi": "3.1.0",
+		"info": {"title": "API", "version": "1.0.0"},
+		"paths": {
+			"/bad": "not-a-path-item",
+			"/things": {"post": {"summary": "Create thing", "requestBody": {
+				"content": {"application/json": {"schema": {
+					"type": "object",
+					"properties": {
+						"badges": {"type": "array", "items": {"type": "object", "properties": {
+							"label": {"type": "string"},
+							"level": {"type": "number"}
+						}, "required": ["label"]}},
+						"count": {"type": "integer"},
+						"flags": {"type": "array", "items": {}},
+						"meta": {"properties": {"k": {"type": "string"}}}
+					}
+				}}}
+			}}}
+		}
+	}`)
+
+	// Act
+	plan, err := ParseOpenAPIDocument(data)
+
+	// Assert - the malformed path entry is skipped silently
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+	if len(plan.Warnings) != 0 {
+		t.Errorf("Expected no warnings, got %v", plan.Warnings)
+	}
+	if apis := allPlanAPIs(plan); len(apis) != 1 {
+		t.Fatalf("Expected only the /things operation, got %+v", apis)
+	}
+
+	// Assert - request nodes in sorted-key order
+	request := findPlanAPI(t, plan, "/things").Request
+	if len(request) != 4 {
+		t.Fatalf("Expected 4 request nodes, got %+v", request)
+	}
+	// Array with an object items schema: one child per element field, sorted.
+	assertNode(t, request[0], "badges", "array", false, 0, nil)
+	if len(request[0].Children) != 2 {
+		t.Fatalf("Expected badges to carry the element fields, got %+v", request[0].Children)
+	}
+	assertNode(t, request[0].Children[0], "label", "string", true, 0, nil)
+	assertNode(t, request[0].Children[1], "level", "number", false, 1, nil)
+	// Unknown schema types degrade to string leaves.
+	assertNode(t, request[1], "count", "string", false, 1, nil)
+	// An empty items schema contributes no children.
+	assertNode(t, request[2], "flags", "array", false, 2, nil)
+	if len(request[2].Children) != 0 {
+		t.Errorf("Expected no children for empty items, got %+v", request[2].Children)
+	}
+	// A schema without "type" but with "properties" reads as an object.
+	assertNode(t, request[3], "meta", "object", false, 3, nil)
+	if len(request[3].Children) != 1 {
+		t.Fatalf("Expected meta to have 1 child, got %+v", request[3].Children)
+	}
+	assertNode(t, request[3].Children[0], "k", "string", false, 0, nil)
+}

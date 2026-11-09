@@ -548,3 +548,84 @@ func assertRowCounts(t *testing.T, db *gorm.DB, groups, apis, params int) {
 		t.Errorf("Expected %d parameters, got %d", params, paramCount)
 	}
 }
+
+// TestApplyImport_InPlanDuplicateGroup covers a plan naming the same group
+// twice: the second occurrence continues on the first's in-memory state,
+// counts as a merge, and its APIs continue the group's order sequence.
+func TestApplyImport_InPlanDuplicateGroup(t *testing.T) {
+	// Arrange - one plan listing Auth twice with one API each
+	db := setupImportApplyTestDB(t)
+	plan := &ImportPlan{
+		Groups: []ImportGroup{
+			{
+				Name: "Auth",
+				APIs: []ImportAPI{{Name: "Login", Endpoint: "/login", Method: "POST", Type: "HTTP"}},
+			},
+			{
+				Name: "Auth",
+				APIs: []ImportAPI{{Name: "Logout", Endpoint: "/logout", Method: "POST", Type: "HTTP"}},
+			},
+		},
+	}
+
+	// Act
+	result, err := ApplyImport(db, ImportFormatPostman, plan, false)
+
+	// Assert - one created group plus one in-plan merge
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+	if result.GroupsCreated != 1 || result.GroupsMerged != 1 {
+		t.Errorf("Expected 1 created / 1 merged, got %d / %d", result.GroupsCreated, result.GroupsMerged)
+	}
+
+	// Assert - a single group row holds both APIs with sequential orders
+	var groups []models.Group
+	if err := db.Find(&groups).Error; err != nil {
+		t.Fatalf("Failed to load groups: %v", err)
+	}
+	if len(groups) != 1 || groups[0].Name != "Auth" {
+		t.Fatalf("Expected a single Auth group, got %+v", groups)
+	}
+	var apis []models.API
+	if err := db.Where("group_id = ?", groups[0].ID).Order("id ASC").Find(&apis).Error; err != nil {
+		t.Fatalf("Failed to load APIs: %v", err)
+	}
+	if len(apis) != 2 {
+		t.Fatalf("Expected 2 APIs in the merged group, got %+v", apis)
+	}
+	if apis[0].Name != "Login" || apis[0].Order != 0 {
+		t.Errorf("Login should have order 0, got %q order %d", apis[0].Name, apis[0].Order)
+	}
+	if apis[1].Name != "Logout" || apis[1].Order != 1 {
+		t.Errorf("Logout should have order 1, got %q order %d", apis[1].Name, apis[1].Order)
+	}
+}
+
+// TestApplyImport_ErrorPropagation covers database failures: with the
+// groups table missing, the very first order query fails and ApplyImport
+// returns the error (and no result) instead of panicking.
+func TestApplyImport_ErrorPropagation(t *testing.T) {
+	// Arrange
+	db := setupImportApplyTestDB(t)
+	if err := db.Migrator().DropTable(&models.Group{}); err != nil {
+		t.Fatalf("Failed to drop groups table: %v", err)
+	}
+	plan := &ImportPlan{
+		Groups: []ImportGroup{{
+			Name: "Auth",
+			APIs: []ImportAPI{{Name: "Login", Endpoint: "/login", Method: "POST", Type: "HTTP"}},
+		}},
+	}
+
+	// Act
+	result, err := ApplyImport(db, ImportFormatPostman, plan, false)
+
+	// Assert
+	if err == nil {
+		t.Fatal("Expected an error when the groups table is missing, got nil")
+	}
+	if result != nil {
+		t.Errorf("Expected a nil result on error, got %+v", result)
+	}
+}

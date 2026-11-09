@@ -566,3 +566,112 @@ func TestBuildOpenAPIDocument_Collision(t *testing.T) {
 		}
 	})
 }
+
+// TestBuildOpenAPIDocument_Verbs covers the remaining operation slots: PUT,
+// PATCH and DELETE APIs must each key their own operation field on the
+// path item instead of collapsing into the post slot.
+func TestBuildOpenAPIDocument_Verbs(t *testing.T) {
+	// Arrange - one API per verb on the same endpoint
+	apis := []APIWithParams{
+		{API: models.API{Name: "Update user", Endpoint: "/users/{id}", Method: "PUT", Type: "HTTP"}, GroupName: "Users"},
+		{API: models.API{Name: "Patch user", Endpoint: "/users/{id}", Method: "PATCH", Type: "HTTP"}, GroupName: "Users"},
+		{API: models.API{Name: "Delete user", Endpoint: "/users/{id}", Method: "DELETE", Type: "HTTP"}, GroupName: "Users"},
+	}
+
+	// Act
+	doc := BuildOpenAPIDocument(apis)
+
+	// Assert - each verb lands in its own slot with its own summary
+	item, ok := doc.Paths["/users/{id}"]
+	if !ok || item == nil {
+		t.Fatalf("Expected a path item for /users/{id}, got %v", doc.Paths)
+	}
+	if item.Put == nil || item.Put.Summary != "Update user" {
+		t.Errorf("Expected a put operation %q, got %+v", "Update user", item.Put)
+	}
+	if item.Patch == nil || item.Patch.Summary != "Patch user" {
+		t.Errorf("Expected a patch operation %q, got %+v", "Patch user", item.Patch)
+	}
+	if item.Delete == nil || item.Delete.Summary != "Delete user" {
+		t.Errorf("Expected a delete operation %q, got %+v", "Delete user", item.Delete)
+	}
+	if item.Get != nil || item.Post != nil {
+		t.Error("Expected no get or post operations for put/patch/delete APIs")
+	}
+}
+
+// TestNodesToJSONSchema_ArrayItemShapes covers the items schema of array
+// nodes: a childless array allows anything (empty schema), and an array
+// whose children describe element fields exports an object element schema
+// carrying properties and its own required list.
+func TestNodesToJSONSchema_ArrayItemShapes(t *testing.T) {
+	t.Run("GivenChildlessArray_whenToSchema_thenEmptyItemsSchema", func(t *testing.T) {
+		// Arrange
+		nodes := []ParamNode{{Name: "flags", Type: "array", Order: 0, Children: []ParamNode{}}}
+
+		// Act
+		schema := NodesToJSONSchema(nodes, false)
+
+		// Assert - the items schema is an empty map: any element is allowed
+		properties, ok := schema["properties"].(map[string]interface{})
+		if !ok {
+			t.Fatalf("Expected properties map, got %T", schema["properties"])
+		}
+		flags, ok := properties["flags"].(map[string]interface{})
+		if !ok {
+			t.Fatalf("Expected flags schema map, got %T", properties["flags"])
+		}
+		items, ok := flags["items"].(map[string]interface{})
+		if !ok {
+			t.Fatalf("Expected an items map, got %T", flags["items"])
+		}
+		if len(items) != 0 {
+			t.Errorf("Expected an empty items schema, got %v", items)
+		}
+	})
+
+	t.Run("GivenArrayWithFieldChildren_whenToSchema_thenObjectElementSchema", func(t *testing.T) {
+		// Arrange - element fields: id (required) and name
+		nodes := []ParamNode{{
+			Name:  "items",
+			Type:  "array",
+			Order: 0,
+			Children: []ParamNode{
+				{Name: "id", Type: "number", Required: true, Order: 0},
+				{Name: "name", Type: "string", Order: 1},
+			},
+		}}
+
+		// Act
+		schema := NodesToJSONSchema(nodes, false)
+
+		// Assert - items is an object schema over the element fields
+		properties, ok := schema["properties"].(map[string]interface{})
+		if !ok {
+			t.Fatalf("Expected properties map, got %T", schema["properties"])
+		}
+		arrayNode, ok := properties["items"].(map[string]interface{})
+		if !ok {
+			t.Fatalf("Expected items schema map, got %T", properties["items"])
+		}
+		items, ok := arrayNode["items"].(map[string]interface{})
+		if !ok {
+			t.Fatalf("Expected an items map, got %T", arrayNode["items"])
+		}
+		if items["type"] != "object" {
+			t.Errorf("Expected items type %q, got %v", "object", items["type"])
+		}
+		elementProperties, ok := items["properties"].(map[string]interface{})
+		if !ok || len(elementProperties) != 2 {
+			t.Fatalf("Expected 2 element properties, got %v", items["properties"])
+		}
+		if _, ok := elementProperties["id"].(map[string]interface{}); !ok {
+			t.Error("Expected an id property schema")
+		}
+		// The element schema always carries required, ungated by objectRequired.
+		required, ok := items["required"].([]string)
+		if !ok || len(required) != 1 || required[0] != "id" {
+			t.Errorf("Expected element required [%q], got %v", "id", items["required"])
+		}
+	})
+}

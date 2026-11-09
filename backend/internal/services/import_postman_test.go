@@ -390,3 +390,57 @@ func TestParsePostmanCollection(t *testing.T) {
 		}
 	})
 }
+
+// TestParsePostmanCollection_Edges covers the remaining lenient paths: a
+// raw body that is valid JSON but not an object, and an unnamed nested
+// folder whose group path stays at the parent folder.
+func TestParsePostmanCollection_Edges(t *testing.T) {
+	t.Run("givenRawBodyNotAnObject_whenParse_thenWarningAndNoParams", func(t *testing.T) {
+		// Arrange - a raw body that parses as JSON but is an array
+		data := []byte(`{
+			"info": {"name": "Collection"},
+			"item": [{"name": "Bulk sync", "request": {"method": "POST", "url": "/bulk",
+				"body": {"mode": "raw", "raw": "[1, 2, 3]"}}}]
+		}`)
+
+		// Act
+		plan, err := ParsePostmanCollection(data)
+
+		// Assert - the API still imports, the body is skipped with a warning
+		if err != nil {
+			t.Fatalf("Expected no error, got %v", err)
+		}
+		api := plan.Groups[0].APIs[0]
+		if len(api.Request) != 0 {
+			t.Errorf("Expected empty request params, got %+v", api.Request)
+		}
+		if len(plan.Warnings) != 1 || !strings.Contains(plan.Warnings[0], "not a JSON object") {
+			t.Errorf("Expected one not-a-JSON-object warning, got %v", plan.Warnings)
+		}
+	})
+
+	t.Run("givenUnnamedFolderInsideNamedFolder_whenParse_thenGroupStaysParentPath", func(t *testing.T) {
+		// Arrange - a nameless folder wrapping one request inside a named
+		// folder: the group path must not gain an empty component
+		data := []byte(`{
+			"info": {"name": "Collection"},
+			"item": [{"name": "Folder", "item": [
+				{"item": [{"name": "Nested", "request": {"method": "GET", "url": "/nested"}}]}
+			]}]
+		}`)
+
+		// Act
+		plan, err := ParsePostmanCollection(data)
+
+		// Assert - the unnamed folder does not extend the group path
+		if err != nil {
+			t.Fatalf("Expected no error, got %v", err)
+		}
+		if len(plan.Groups) != 1 || plan.Groups[0].Name != "Folder" {
+			t.Fatalf("Expected a single %q group, got %+v", "Folder", plan.Groups)
+		}
+		if apis := plan.Groups[0].APIs; len(apis) != 1 || apis[0].Name != "Nested" {
+			t.Errorf("Expected [Nested] in group %q, got %+v", "Folder", plan.Groups[0].APIs)
+		}
+	})
+}

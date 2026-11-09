@@ -1,1 +1,4 @@
 internal/embedded/frontend_dist/
+
+# Test coverage profile (make test-coverage)
+coverage.out
