@@ -23,21 +23,21 @@
 
 ## Review Focus
 
-1. **`go mod tidy` under `go.work` with an unpublished version** — `backend/go.mod` requires `models v1.0.0` before the tag exists; workspace builds/tests must succeed without tidy fetching it. If tidy fails pre-tag, the dev flow is: edit `go.mod` by hand (require + go.sum entries added at the §10.5 bootstrap after tagging), and T1 must verify `go build ./... && go test ./...` both work under the workspace. Pinned in Task 1.
-2. **Backend Makefile gate false-trip after the move** — once `param_node`/`export_knot` functions leave the backend module, the old grep matches fewer/no lines and the v0.6.0 "no functions matched" guard fires. Pinned in Task 2.
-3. **`group_test.go`'s GORM-tag tests** must land in `gormbind_test.go` (they import gorm + sqlite), keeping the root package's moved tests stdlib-only. Pinned in Task 3.
-4. **Generator pinning** — `tools/go.mod` must pin exact generator versions; regenerated goldens are committed and CI-diffed. Pinned in Task 4.
-5. **`--latest=false` on the library release** so it never steals the product's Latest badge (release runbook step, not a code task; recorded in Task 6's README runbook section).
+1. **`go mod tidy` under `go.work` with an unpublished version** — `backend/go.mod` requires `models v1.0.0` before the tag exists; workspace builds/tests must succeed without tidy fetching it. Dev flow: hand-edit `go.mod` (require only; go.sum entries added at the §10.5 bootstrap after tagging). T1 verifies workspace builds/tests. Note: `go.work` must declare `go 1.25.5` (the max module go directive — `1.25` fails), and root-level `go build ./...` does NOT work in a multi-module workspace — use explicit module patterns (`./backend/... ./models/...`) or per-module `cd`. Pinned in Task 1.
+2. **Backend Makefile gate after the move** — `param_node` matches zero lines once param_node.go is deleted, but `export_knot`/`export_openapi`/`export_postman`/`import_*`/handlers still match, so the guard never fires; the pattern stays UNCHANGED except dropping the dead `param_node|` token. Do not un-gate live code. Pinned in Task 2.
+3. **Test split scope** — `setupTestDB` (defined in `group_test.go`, importing gorm+sqlite) is called by ~26 test functions across all THREE test files, not just group_test.go. Every `setupTestDB`-calling test is removed from the root package in T1 and re-homed in T3's `gormbind_test.go`; only stdlib-only tests (marshal/type behavior) stay in the root. Pinned in Tasks 1 and 3.
+4. **Generator pinning** — `tools/go.mod` pins exact generator versions; goldens committed and CI-diffed. Pinned in Task 4.
+5. **`--latest=false` on the library release** so it never steals the product's Latest badge (runbook step; recorded in Task 6's README runbook section).
 
 ---
 
 ### Task 1: Models module skeleton + domain types move
 
 **Files:**
-- Create: `models/go.mod`, `models/api.go`, `models/group.go`, `models/parameter.go`, `models/constants.go`, `models/api_test.go`, `models/group_test.go` (stdlib-only subset), `models/parameter_test.go` (stdlib-only subset), `models/Makefile` (minimal `test` target for now)
-- Create: `go.work`
+- Create: `models/go.mod`, `models/api.go`, `models/group.go`, `models/parameter.go`, `models/constants.go`, `models/constants_test.go`, `models/api_test.go` (stdlib-only subset), `models/group_test.go` (stdlib-only subset), `models/parameter_test.go` (stdlib-only subset), `models/Makefile` (minimal `test` target for now)
+- Create: `go.work` (declares `go 1.25.5`), `tools/go.mod` (placeholder `module github.com/ProjAnvil/knot/tools`)
 - Delete: `backend/internal/models/` (whole dir)
-- Modify: all 11 backend importers (`backend/internal/database/database.go`, handlers ×4: `groups.go` `apis.go` `export.go` `mcp_tools.go`, services ×6: `export_service.go` `export_knot.go` `export_openapi.go` `export_postman.go` `param_node.go` `parameter_service.go` `import_apply.go` — verify with grep), `backend/go.mod` (+`require github.com/ProjAnvil/knot/models v1.0.0`)
+- Modify: every backend file importing `internal/models` — non-test: `database/database.go`, handlers `apis.go` `export.go` `groups.go` `mcp_tools.go`, services `export_openapi.go` `export_postman.go` `export_service.go` `import_apply.go` `param_node.go` `parameter_service.go` — PLUS ~14 `_test.go` files (find the full set with `grep -rln 'internal/models' backend --include='*.go'`); `backend/go.mod` (+`require github.com/ProjAnvil/knot/models v1.0.0`, hand-edited — no tidy pre-tag)
 
 **Interfaces:**
 - Produces: module `github.com/ProjAnvil/knot/models`, package `models`, exporting exactly what `backend/internal/models` exported (`API`, `Group`, `Parameter` + methods) PLUS `constants.go`:
@@ -54,27 +54,27 @@ func IsValidParamType(t string) bool
 func IsValidParamValueType(t string) bool
 ```
 
-- `go.work`: `go 1.25` + `use (./backend ./models ./tools ./mcp-server)` — create `tools/go.mod` as a placeholder module now (`module github.com/ProjAnvil/knot/tools`) so go.work is valid; generators come in Task 4.
+- `go.work`: `go 1.25.5` + `use (./backend ./models ./tools ./mcp-server)` — `tools/go.mod` placeholder now; generators come in Task 4. Generate via `go work init ./backend ./models ./tools ./mcp-server` to get a valid go directive, or hand-write with 1.25.5.
 
-- [ ] **Step 1: Write failing tests** for `constants.go` (`TestIsValidMethod` etc. — move-ready new file `models/constants_test.go`).
+- [ ] **Step 1: Write failing tests** for `constants.go` (`TestIsValidMethod` etc. — new file `models/constants_test.go`).
 - [ ] **Step 2: Verify RED** (`cd models && go test ./...` — package doesn't exist yet).
-- [ ] **Step 3: Implement the move**: `git mv backend/internal/models/*.go models/` (keep history); split test files — GORM-importing tests (`group_test.go`'s gorm parts) parked into `models/gormbind_parked_test.go` temporarily OR simply moved in Task 3 (cleanest: delete the gorm-dependent test funcs from root test files now, re-home them in Task 3's `gormbind_test.go` — they are identified by their imports; keep every stdlib-only test). Then fix all backend importers to `import models "github.com/ProjAnvil/knot/models"`, add the require to `backend/go.mod` by hand, write `go.work`.
-- [ ] **Step 4: Verify GREEN (Review Focus 1)**: from repo root: `go build ./... && go test ./backend/... ./models/...` all pass under the workspace; `cd mcp-server && go build ./...` still builds (go.work uses it). `cd backend && make test-coverage` — gate still green (nothing moved out of its pattern yet — param_node etc. still in services until Task 2).
+- [ ] **Step 3: Implement the move**: `git mv backend/internal/models/*.go models/`; strip from the three test files EVERY test function that calls `setupTestDB` (~26 across api/group/parameter_test.go — `setupTestDB` itself and its gorm/sqlite imports go too; these tests are re-homed in Task 3) keeping only stdlib-only tests; fix ALL importers (incl. `_test.go`) to `import models "github.com/ProjAnvil/knot/models"`; hand-add the require to `backend/go.mod`; write `go.work`.
+- [ ] **Step 4: Verify GREEN (Review Focus 1)**: `go build ./backend/... ./models/... && go test ./backend/... ./models/...` (from repo root, explicit module patterns — bare `./...` fails in a workspace); `cd mcp-server && go build ./...` still builds (go.work uses it). `cd backend && make test-coverage` — gate still green (param_node etc. still in services until Task 2).
 - [ ] **Step 5: Commit** `refactor: extract domain models into publishable models module`
 
 ### Task 2: Wire-format types move
 
 **Files:**
 - Create: `models/param_node.go` (+ test), `models/wire.go` (+ test), `models/import_plan.go`
-- Delete: type definitions from `backend/internal/services/param_node.go`, `export_knot.go`, `import_knot.go`, `import_detect.go` (functions stay)
-- Modify: every services file referencing the moved types; `backend/Makefile` (gate pattern); their test files (move type-level tests, keep round-trip tests in backend)
+- Delete: `backend/internal/services/param_node.go` ENTIRELY (it contains only `ParamNode`, the private helper `paramNodeFromValue`, and the four functions — all of which move); type definition blocks removed from `services/export_knot.go`, `services/import_knot.go`, `services/import_detect.go` (their functions stay)
+- Modify: every services file referencing the moved types; `backend/Makefile` (gate pattern: drop ONLY the now-dead `param_node|` token); services test files (move type-level tests, keep round-trip tests in backend)
 
 **Interfaces:**
-- Moves verbatim (names, fields, JSON tags unchanged): `ParamNode`, `TreeFromParams`, `ParamNodesFromJSONValue`, `CountNodes`; `KnotExportDocument/Group/API/Params` + new consts `WireFormat = "knot"`, `WireVersion = 1` (services literals `"knot"`/`1` switch to the consts — output unchanged); `ImportPlan`, `ImportGroup`, `ImportAPI`, `ImportFormat` + its three consts.
+- Moves verbatim (names, fields, JSON tags unchanged): `ParamNode`, `paramNodeFromValue` (private), `TreeFromParams`, `ParamNodesFromJSONValue`, `CountNodes`; `KnotExportDocument/Group/API/Params` + new consts `WireFormat = "knot"`, `WireVersion = 1` (services literals `"knot"`/`1` switch to the consts — output unchanged); `ImportPlan`, `ImportGroup`, `ImportAPI`, `ImportFormat` + its three consts.
 - Services files keep every function (`BuildKnotDocument`, `ParseKnotJSON`, `DetectImportFormat`, `ApplyImport`, …) now referencing `models.<Type>`.
-- `backend/Makefile` gate: drop `param_node|export_knot|export_openapi|export_postman` from the function-name pattern only if those functions fully moved (they did NOT — builders stay in services); the pattern matches `go tool cover -func` output **file paths**: after the move, `param_node.go`/`export_knot.go` still exist in services with functions — the moved items are types + 3 helpers. Reconcile: remove the 3 moved helper names' file from matching by updating the pattern to keep gating what remains (`import_detect|import_knot|import_postman|import_openapi|import_apply|export_service|handlers/...` — final list = every remaining non-test services/handlers file touched by this project series) and confirm the "no functions matched" guard does not fire.
-- [ ] **Step 1: Move with `git mv` semantics** (copy file → trim to functions → delete originals' type blocks), update references, hand-add nothing to go.mod (same module).
-- [ ] **Step 2: Verify** (Review Focus 2): `go build ./... && go test ./...` (root, workspace); `cd backend && make test-coverage` green with updated pattern; wire-format byte check: existing `TestBuildKnotDocument` golden assertions pass unmodified.
+- `backend/Makefile` gate: pattern stays otherwise UNCHANGED — `export_knot`/`export_openapi`/`export_postman`/`import_*`/handlers still gate live code; only the `param_node|` token dies with the deleted file. Confirm the "no functions matched" guard does not fire (it won't — remaining tokens still match).
+- [ ] **Step 1: Move with `git mv` semantics** (param_node.go moves whole; the others lose only their type blocks), update references; no go.mod change (same module already required).
+- [ ] **Step 2: Verify** (Review Focus 2): `go build ./backend/... ./models/... && go test ./backend/... ./models/...`; `cd backend && make test-coverage` green with the one-token pattern fix; wire-format byte check: existing `TestBuildKnotDocument` golden assertions pass unmodified.
 - [ ] **Step 3: Commit** `refactor: move wire-format and param tree types into models module`
 
 ### Task 3: gormbind subpackage + database wiring
@@ -91,7 +91,7 @@ func MigrateModels() []any                    // [&models.Group{}, &models.API{}
 func AutoMigrate(db *gorm.DB) error           // db.AutoMigrate(MigrateModels()...)
 ```
 
-- `gormbind_test.go`: the GORM-tag behavioral tests rescued from `group_test.go` (unique-name constraint, cascade, index) + `TestMigrateModels` (in-memory sqlite, AutoMigrate succeeds, tables exist) + `TestAutoMigrate` idempotent double-run.
+- `gormbind_test.go`: re-homes the ~26 `setupTestDB`-calling behavioral tests rescued in Task 1 from ALL THREE model test files (api/group/parameter: GORM tags, unique-name constraint, cascade, index, query ops) — importing `gormbind`'s own sqlite-backed `setupTestDB` — plus new `TestMigrateModels` (model list order) and `TestAutoMigrate` (in-memory sqlite, succeeds, idempotent double-run).
 - [ ] **Step 1: Failing tests** (`cd models && go test ./gormbind/...` — package missing).
 - [ ] **Step 2: RED verified.** Implement; wire `database.go`; `models/go.mod` gains `gorm.io/gorm` + test-only `github.com/glebarez/sqlite`.
 - [ ] **Step 3: Verify GREEN**: models suite + `make test-coverage` (models gate green, ≥85% on gated functions); backend full suite green; `cd backend && go build ./...` under GOWORK=off still resolves? NO — v1.0.0 unpublished (expected; workspace only). Record in report.
@@ -105,11 +105,11 @@ func AutoMigrate(db *gorm.DB) error           // db.AutoMigrate(MigrateModels().
 
 **Interfaces:**
 - `gen-schema`: reflect over `models.KnotExportDocument` via invopop/jsonschema (draft 2020-12), `$id` = `https://github.com/ProjAnvil/knot/models/schema/knot-v1.schema.json`, then post-process: pin `properties.format.const = "knot"`, `properties.version.const = 1`. Deterministic output (sorted keys) → written to `models/schema/knot-v1.schema.json`.
-- `gen-ts`: tygo config targeting package `models` (root only, not gormbind) → `models/ts/index.d.ts`. Header comment "Code generated by tools/cmd/gen-ts. DO NOT EDIT."
+- `gen-ts`: tygo config (YAML `packages:` with `path` + `output_path`, NOT `outPath`) targeting package `models` root only → `models/ts/index.d.ts`; the wrapper prepends the "Code generated by tools/cmd/gen-ts. DO NOT EDIT." header itself.
 - Both run from repo root: `go run ./tools/cmd/gen-schema` / `go run ./tools/cmd/gen-ts` (workspace resolves models).
 
 - [ ] **Step 1: Implement both generators; generate goldens; commit goldens.**
-- [ ] **Step 2: Verify (Review Focus 4)**: regenerate twice → `git diff --exit-code` clean (determinism); schema validates a real exported Knot JSON document — write `tools/cmd/gen-schema/schema_smoke_test.go`? No — put the validation test in `models/wire_test.go`-adjacent backend-independent spot: `models/schema_test.go` loading the committed schema with invopop… invopop is tools-only. Instead: backend test `export_knot_test.go` gains a subtest `givenKnotDocument_whenValidatedAgainstSchema_thenValid` using samjholt… no — keep it simple: `tools/cmd/gen-schema` gains a `--check` mode that validates `services` output? Simplest honest check: a tools-module test that loads the golden schema and a fixed sample document via `github.com/santhosh-tekuri/jsonschema` — that's another dep. **Decision:** schema correctness is pinned by (a) generation is reflection from the same types the round-trip tests exercise, and (b) `git diff` drift lock. A validator test is nice-to-have; skip extra deps. Document this trade-off in the report.
+- [ ] **Step 2: Verify (Review Focus 4)**: regenerate twice → `git diff --exit-code -- models/schema models/ts` clean (determinism). Schema correctness is pinned by construction — the schema is reflection over the same types the round-trip tests exercise — plus the drift lock; do NOT add a JSON-Schema-validator dependency for this.
 - [ ] **Step 3: Commit** `feat: add JSON Schema and TypeScript generators with committed goldens`
 
 ### Task 5: CI — models job + drift + consumption smoke
@@ -118,10 +118,10 @@ func AutoMigrate(db *gorm.DB) error           // db.AutoMigrate(MigrateModels().
 - Modify: `.github/workflows/ci.yml`
 
 **Interfaces:**
-- New `models` job (runs with the other three): checkout; setup-go (`go-version-file: models/go.mod`); `go build ./... && go test ./...` from `models/`; `make test-coverage` in `models/` (gate); `go run ./tools/cmd/gen-schema && go run ./tools/cmd/gen-ts && git diff --exit-code -- models/schema models/ts` (drift lock); consumption smoke: create `$(mktemp -d)/smoke`, `go mod init smoke`, `go mod edit -replace github.com/ProjAnvil/knot/models=$GITHUB_WORKSPACE/models`, write `main.go` importing `models` (a Group literal + `models.IsValidMethod("GET")`) and `models/gormbind` (`_ "github.com/ProjAnvil/knot/models/gormbind"` or MigrateModels length check), `GOWORK=off go build ./...` — proves the module graph is consumable without the workspace (Review Focus for the Docker path).
-- Existing `backend` job gains one step AFTER tests: `GOWORK=off go build ./...` is expected to FAIL pre-tag — do NOT add it; instead the job stays workspace-based, and the release runbook (§10.5) does the bootstrap. Add a comment in ci.yml noting this.
+- New `models` job (runs with the other three): checkout; setup-go (`go-version-file: models/go.mod`; note GOTOOLCHAIN=auto may download the go.work toolchain version — acceptable); `cd models && go build ./... && go test ./...`; `make test-coverage` in `models/` (gate); drift lock FROM REPO ROOT (not models/): `go run ./tools/cmd/gen-schema && go run ./tools/cmd/gen-ts && git diff --exit-code -- models/schema models/ts`; consumption smoke: `SMOKE=$(mktemp -d) && cd $SMOKE && go mod init smoke && go mod edit -replace github.com/ProjAnvil/knot/models=$GITHUB_WORKSPACE/models`, write `main.go` importing `models` (Group literal + `models.IsValidMethod("GET")`) and `models/gormbind` (`len(gormbind.MigrateModels()) == 3`), then `GOWORK=off go mod tidy && GOWORK=off go build ./...` (tidy is REQUIRED — a replace without a require yields "no required module provides package"); proves the module graph is consumable without the workspace.
+- Existing `backend` job stays workspace-based; `GOWORK=off` builds are expected to fail pre-tag — do NOT add such a step; add a comment in ci.yml noting the §10.5 bootstrap handles it.
 - [ ] **Step 1: Write ci.yml changes; YAML-validate.**
-- [ ] **Step 2: Verify locally**: replicate the models job steps in a shell script run (all pass, incl. smoke with temp dir + replace + GOWORK=off).
+- [ ] **Step 2: Verify locally**: replicate the models job steps in a shell script run (all pass, incl. smoke with temp dir + replace + tidy + GOWORK=off).
 - [ ] **Step 3: Commit** `ci: add models module job with drift lock and consumption smoke`
 
 ### Task 6: Documentation
