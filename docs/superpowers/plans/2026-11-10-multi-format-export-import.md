@@ -15,8 +15,10 @@
 - ALL code comments, commit messages, PR body, and release notes in **English**.
 - **No new Go module dependencies** — stdlib only (`encoding/json`, `crypto/rand`, `mime`).
 - **No DB schema changes/migrations** — reuse `groups`/`apis`/`parameters` tables.
-- `POST /api/export` with no `format` field must behave exactly as today (HTML, `api-docs-<unixts>.html`).
-- Fiber `BodyLimit` = 10 MB wherever the app is created (`internal/cli/serve.go:50`, `cmd/server/main.go:38`, handler test apps).
+- `POST /api/export` with no `format` field must behave exactly as today (HTML, static `filename="api-docs.html"`); the three new formats carry server-side timestamped filenames.
+- Fiber `BodyLimit` = 10 MB at the production app-creation sites (`internal/cli/serve.go:50`, `cmd/server/main.go:38`) and in the new import test app; the existing export test app keeps its 4 MB.
+- Use the **exact test names listed in each task** — the `-run` filters depend on them (they override any file-local naming convention).
+- Run single frontend test files with `bunx vitest run <path>` (`bun run test` is watch-mode and hangs non-interactive shells).
 - Import group conflict: **merge** (append APIs to same-name group; new API `order` continues after that group's max; new groups continue after max group `order`).
 - RPC round-trip in OpenAPI/Postman: export as `POST` + `x-knot-type: "rpc"`; import restores `Type: "RPC"`, `Method: ""`.
 - Coverage gate: **≥ 85% statements on every new `services`/`handlers` file**, measured by `make test-coverage` (backend).
@@ -43,7 +45,7 @@ Failure modes the spec implies but task tests must pin (each pinned in its ownin
 - Test: `backend/internal/services/param_node_test.go`
 
 **Interfaces:**
-- Consumes: `models.Parameter`, `models.APIWithParams` (existing).
+- Consumes: `models.Parameter`, `services.APIWithParams` (existing).
 - Produces (used by Tasks 2–9):
 
 ```go
@@ -75,10 +77,11 @@ func CountNodes(nodes []ParamNode) int
 
 **Files:**
 - Create: `backend/internal/services/export_knot.go`
+- Modify: `backend/internal/services/export_service.go` (add `GroupOrder int` field to `APIWithParams`; zero value keeps existing callers compiling)
 - Test: `backend/internal/services/export_knot_test.go`
 
 **Interfaces:**
-- Consumes: `APIWithParams`, `ParamNode`/`TreeFromParams` (Task 1).
+- Consumes: `APIWithParams` (now with `GroupOrder`), `ParamNode`/`TreeFromParams` (Task 1).
 - Produces (used by Task 5; parser in Task 6 reads the same JSON shape):
 
 ```go
@@ -92,7 +95,7 @@ func BuildKnotDocument(apis []APIWithParams, now time.Time) *KnotExportDocument
 
 - [ ] **Step 1: Write failing test** `TestBuildKnotDocument`: two APIs in one group + one in another, nested request/response params, one nil note → assert `Format=="knot"`, `Version==1`, `ExportedAt==now.UTC().Format(time.RFC3339)`, group names/orders, `parameters.request[0].children` nesting, `method` upper-cased, empty groups omitted.
 - [ ] **Step 2: Run** `go test ./internal/services/ -run TestBuildKnotDocument -v` → FAIL.
-- [ ] **Step 3: Implement.** Group `APIWithParams` by `API.GroupID` (insertion order, as `GenerateHTML` does); per API build `TreeFromParams` for each paramType.
+- [ ] **Step 3: Implement.** Group `APIWithParams` by `API.GroupID` in **first-appearance order** (track group order with a seen-set as you iterate; do not copy `GenerateHTML`'s map-iteration approach, which randomizes); `KnotExportGroup.Order` = the group's `GroupOrder` value; per API build `TreeFromParams` for each paramType.
 - [ ] **Step 4: Run** → PASS. Also run `go test ./internal/services/` (no regressions).
 - [ ] **Step 5: Commit** `feat: add Knot JSON v1 export document builder`
 
@@ -147,7 +150,7 @@ func NewUUIDv4() string  // crypto/rand, no dependency
 
 - [ ] **Step 1: Write failing test** `TestBuildPostmanCollection`: group→folder items; request item has `method` (RPC → `"POST"` + `x-knot-type:"rpc"`), `url.raw` = endpoint, `description` = note, `body.mode=="raw"` with `GenerateExampleJSON` output when request params exist (omitted when absent), `response[0].body` from response params; `info.schema` is the v2.1 URL; `_postman_id` matches UUID format. Plus `TestNewUUIDv4` (unique across 100 calls).
 - [ ] **Step 2: Run** `go test ./internal/services/ -run 'TestBuildPostmanCollection|TestNewUUIDv4' -v` → FAIL.
-- [ ] **Step 3: Implement.** Reuse `GenerateExampleJSON` on the built param trees; marshal examples with `json.MarshalIndent(..., "", "  ")`.
+- [ ] **Step 3: Implement.** Example bodies come from the existing `models.Parameter` pair — `GenerateExampleJSON(BuildParameterTree(api.RequestParameters))` (and `ResponseParameters` for the response example); `ParamNode` is not fed to `GenerateExampleJSON` (its signature takes `[]models.Parameter`). Marshal examples with `json.MarshalIndent(..., "", "  ")`.
 - [ ] **Step 4: Run** → PASS.
 - [ ] **Step 5: Commit** `feat: add Postman Collection v2.1 export builder`
 
@@ -159,10 +162,10 @@ func NewUUIDv4() string  // crypto/rand, no dependency
 
 **Interfaces:**
 - Consumes: `BuildKnotDocument`, `BuildOpenAPIDocument`, `BuildPostmanCollection`, existing `GenerateHTML`.
-- Produces: `POST /api/export` body `{apiIds []uint, format string}`; responses per spec §7.1 table (Content-Type + `Content-Disposition: attachment; filename=...` built with `mime.FormatMediaType`). Unknown format → `response.BadRequest(c, "Unsupported export format")`.
+- Produces: `POST /api/export` body `{apiIds []uint, format string}`; responses per spec §7.1 table (Content-Type + `Content-Disposition`). Keep the current hand-quoted header form `fmt.Sprintf("attachment; filename=%q", name)` for all formats — `mime.FormatMediaType` emits unquoted token-safe names and the frontend regex is written against quoted names. HTML keeps its exact current static filename `api-docs.html`; the new formats use `<prefix>-<unixts>.<ext>`. Unknown format → `response.BadRequest(c, "Unsupported export format")`. Also populate `APIWithParams.GroupOrder` in the fetch phase (the groups are already loaded; carry `Order` through instead of just the name).
 
 - [ ] **Step 1: Write failing tests** in `export_test.go` (reuse `setupTestDB`/`setupExportTestApp`, extend the app setup only if routes change — they don't):
-  - `givenNoFormatField_whenExport_thenHTMLIdenticalBehavior`: assert status 200, `Content-Type: text/html; charset=utf-8`, `Content-Disposition` contains `api-docs-` and `.html` (Review Focus 4).
+  - `givenNoFormatField_whenExport_thenHTMLIdenticalBehavior`: assert status 200, `Content-Type: text/html; charset=utf-8`, `Content-Disposition` contains `filename="api-docs.html"` exactly (Review Focus 4; current handler sends the static quoted name — no timestamp).
   - `givenFormatJSON_whenExport_thenKnotEnvelope`: body parses as JSON with `format:"knot"`, `version:1`; filename `knot-export-*.json`.
   - `givenFormatOpenAPI_whenExport_thenOpenAPIEnvelope`: `openapi:"3.1.0"`; filename `openapi-*.json`.
   - `givenFormatPostman_whenExport_thenPostmanEnvelope`: `info.schema` contains `schema.getpostman.com`; filename `postman-*.json`.
@@ -245,7 +248,7 @@ func ParseKnotJSON(data []byte) (*ImportPlan, error)
 - Test: `backend/internal/services/import_apply_test.go`
 
 **Interfaces:**
-- Consumes: `ImportPlan` (Task 6), `models.*`, `*gorm.DB` (test DB setup pattern from `export_service_test.go` / `parameter_service_test.go`).
+- Consumes: `ImportPlan` (Task 6), `models.*`, `*gorm.DB`. Test DB setup: the services-package `setupTestDB` in `parameter_service_test.go` migrates only `models.Parameter` — write a local helper (or extend it) that migrates `models.Group`, `models.API`, and `models.Parameter`.
 - Produces (used by Task 10):
 
 ```go
@@ -265,7 +268,7 @@ func ApplyImport(db *gorm.DB, format ImportFormat, plan *ImportPlan, dryRun bool
   - existing same-name group: `GroupsMerged==1`, APIs appended, API order continues after existing max, group order untouched.
   - `dryRun=true`: identical result counts, zero rows written.
   - parse warnings surfaced into `Warnings`.
-  - failure mid-import (make one API row invalid, e.g. empty name → DB error) → transaction rolled back, DB unchanged.
+  - failure mid-import → transaction rolled back, DB unchanged. Inject deterministically with a GORM callback, e.g. `db.Callback().Create().Before("gorm:create")` returning an error once a counter hits N (an empty `Name` will NOT fail — SQLite `not null` rejects NULL, not empty strings, and GORM does no validation).
 - [ ] **Step 2: Run** `go test ./internal/services/ -run TestApplyImport -v` → FAIL.
 - [ ] **Step 3: Implement** per spec §8.4: single `db.Transaction`; recursive parameter insert (create parent row, use returned ID for children); group lookup inside the tx.
 - [ ] **Step 4: Run** → PASS.
@@ -295,10 +298,10 @@ func ApplyImport(db *gorm.DB, format ImportFormat, plan *ImportPlan, dryRun bool
 - Test: `backend/internal/config/config_test.go`
 
 **Interfaces:**
-- Consumes: existing `KNOT_SQLITE_PATH` override pattern (adjacent code).
+- Consumes: existing `KNOT_SQLITE_PATH` override block (`config.go:119-132`, currently untested).
 - Produces: `KNOT_PORT` env → `config.Port` (needed by Task 15's E2E runner).
 
-- [ ] **Step 1: Write failing test** `TestLoadConfig_PortEnvOverride` (set env, assert `config.Port`), mirroring the existing sqlite-path test.
+- [ ] **Step 1: Write failing test** `TestLoadConfig_PortEnvOverride` using `t.Setenv("KNOT_PORT", "4321")` — there is no existing sqlite-path test to mirror, and do not set `PORT` (a preexisting `PORT` override in `serve.go` takes precedence over config; unset it with `t.Setenv("PORT", "")` handling as appropriate).
 - [ ] **Step 2: Run** `go test ./internal/config/ -run TestLoadConfig_PortEnvOverride -v` → FAIL.
 - [ ] **Step 3: Implement** one `strconv.Atoi` + assignment in the override block.
 - [ ] **Step 4: Run** `go test ./internal/config/` → PASS.
@@ -324,26 +327,26 @@ export async function exportApis(apiIds: number[], format: ExportFormat): Promis
 export async function importDocument(file: File, dryRun: boolean): Promise<ApiResult<ImportPreview>>
 ```
 
-- [ ] **Step 1: Write failing vitest tests** (mock `fetch`): `exportApis` posts `{apiIds, format}`, parses filename from `Content-Disposition` via regex `filename="([^"]+)"`, returns blob; non-OK → error object. `importDocument` posts `FormData` with `file` + `dryRun`, returns parsed `ApiResult`.
-- [ ] **Step 2: Run** `cd frontend && bun run test -- src/lib/api.test.ts` → FAIL.
+- [ ] **Step 1: Write failing vitest tests** (mock `fetch`): `exportApis` posts `{apiIds, format}`, parses filename from `Content-Disposition` with a tolerant regex `filename="?([^";]+)"?` (must match both quoted and unquoted forms), returns blob; non-OK → error object. `importDocument` posts `FormData` with `file` + `dryRun`, returns parsed `ApiResult`.
+- [ ] **Step 2: Run** `cd frontend && bunx vitest run src/lib/api.test.ts` → FAIL.
 - [ ] **Step 3: Implement** both functions following the existing try/catch style in `api.ts`.
-- [ ] **Step 4: Run** `bun run test` → PASS.
+- [ ] **Step 4: Run** `bunx vitest run` → PASS.
 - [ ] **Step 5: Commit** `feat(frontend): add export/import API client functions`
 
 ### Task 13: ExportDialog format picker
 
 **Files:**
 - Modify: `frontend/src/lib/components/dialogs/ExportDialog.svelte`
-- Modify: `frontend/src/lib/i18n/locales/en.json`, `frontend/src/lib/i18n/locales/zh-CN.json` (add `export.format.html/json/openapi/postman` + `export.formatLabel`; adjust `export.exportHtml` usage to a generic `export.confirm`)
+- Modify: `frontend/src/lib/i18n/locales/en.json`, `frontend/src/lib/i18n/locales/zh-CN.json` (add `export.format.html/json/openapi/postman` labels **plus `export.format.<fmt>.desc` one-line descriptions**, `export.formatLabel`; adjust `export.exportHtml` usage to a generic `export.confirm`; keep en/zh key parity — `i18n.test.ts` enforces it)
 
 **Interfaces:**
 - Consumes: `ExportFormat`, `exportApis` (Task 12).
 - Produces: `ExportDialog` accepts prop-free usage as today; emits nothing new (parent `Sidebar`/page unchanged).
 
-- [ ] **Step 1: Write failing vitest component test** `frontend/src/lib/components/dialogs/ExportDialog.test.ts`: renders four format radios (i18n labels via test locale init pattern from existing component tests if present, else set `init({fallbackLocale:'en', locale:'en'})` before mount); default selection `html`; selecting `json` and submitting calls `fetch` with `"format":"json"` and triggers download with server filename. If component-test harness for dialogs proves impractical with `Dialog.svelte` portal behavior, test the extracted pure helper `formatExtension(format)` + the fetch payload, and note the UI click-path is covered by Task 15 E2E — do not skip the fetch-assertion part.
-- [ ] **Step 2: Run** `bun run test -- ExportDialog` → FAIL.
+- [ ] **Step 1: Write failing vitest component test** `frontend/src/lib/components/dialogs/ExportDialog.test.ts`: render with svelte-i18n initialized as `init({ fallbackLocale: 'en', locale: 'en', messages: { en } })` where `en` is imported from `../i18n/locales/en.json` (without `messages`, `$_()` returns raw keys); assert four format radios render with en labels; default selection `html`; selecting `json` and submitting calls `fetch` with `"format":"json"` and triggers download with the server filename. `ui/dialog.svelte` renders an inline fixed overlay (no portal), so plain container queries work.
+- [ ] **Step 2: Run** `bunx vitest run src/lib/components/dialogs/ExportDialog.test.ts` → FAIL.
 - [ ] **Step 3: Implement** radio-card group above the selection tree; replace hardcoded `.html` download name with server-provided filename; neutral button label.
-- [ ] **Step 4: Run** `bun run test && bun run check` → PASS.
+- [ ] **Step 4: Run** `bunx vitest run && bun run check` → PASS.
 - [ ] **Step 5: Commit** `feat(frontend): add export format picker to export dialog`
 
 ### Task 14: ImportDialog + sidebar entry
@@ -357,9 +360,9 @@ export async function importDocument(file: File, dryRun: boolean): Promise<ApiRe
 - Produces: `ImportDialog` with callback prop `onImported: () => void` (parent refreshes groups).
 
 - [ ] **Step 1: Write failing vitest tests**: file input sets state; mock `importDocument` dryRun response renders counts + warnings; confirm calls non-dryRun `importDocument` then `onImported`; 415 error renders unsupported-format message.
-- [ ] **Step 2: Run** `bun run test -- ImportDialog` → FAIL.
+- [ ] **Step 2: Run** `bunx vitest run src/lib/components/dialogs/ImportDialog.test.ts` → FAIL.
 - [ ] **Step 3: Implement** dialog flow (pick → auto dryRun → preview panel → confirm → toast + `onImported()`); add Sidebar trigger button.
-- [ ] **Step 4: Run** `bun run test && bun run check` → PASS.
+- [ ] **Step 4: Run** `bunx vitest run && bun run check` → PASS.
 - [ ] **Step 5: Commit** `feat(frontend): add import dialog with preview-before-confirm flow`
 
 ### Task 15: Playwright infrastructure + round-trip E2E
@@ -370,7 +373,13 @@ export async function importDocument(file: File, dryRun: boolean): Promise<ApiRe
 
 **Interfaces:**
 - Consumes: Tasks 10–11 (endpoint + `KNOT_PORT`/`KNOT_SQLITE_PATH`), Tasks 13–14 (UI).
-- Produces: E2E harness reused by Task 16. `run-env.sh`: `bun run build` → verify the embedded-frontend build expectation in `backend/internal/handlers/static_embedded.go` (embed path — check the `embedfrontend` tag usage in `backend/Makefile` `package` target and mirror it) → `go build -tags embedfrontend -o e2e/bin/knot-e2e ./cmd/cli` → `KNOT_PORT=3999 KNOT_SQLITE_PATH=$E2E_DB_DIR/knot-e2e.db exec ./e2e/bin/knot-e2e __serve`. `playwright.config.ts`: `webServer.command='bash e2e/run-env.sh'`, `url='http://localhost:3999'`, `reuseExistingServer: !process.env.CI`, `use.baseURL`, downloads acceptance.
+- Produces: E2E harness reused by Task 16. `run-env.sh` runs **from `frontend/`** (Playwright sets cwd to the config dir) and must do, in order:
+  1. `bun run build`
+  2. `cd ../backend && rm -rf internal/embedded/frontend_dist && mkdir -p internal/embedded/frontend_dist && cp -r ../frontend/dist/* internal/embedded/frontend_dist/` — the `//go:embed all:frontend_dist` directive lives in `backend/internal/embedded/frontend.go` behind the `embedfrontend` tag, and `frontend_dist` is untracked, so it must be (re)populated or the tagged build fails on a fresh checkout and serves a stale UI on dev machines
+  3. `go build -tags embedfrontend -o ../frontend/e2e/bin/knot-e2e ./cmd/cli`
+  4. `cd ../frontend && exec env -u PORT KNOT_PORT=3999 KNOT_SQLITE_PATH=$E2E_DB_DIR/knot-e2e.db ./e2e/bin/knot-e2e __serve` (`env -u PORT` because a preexisting `PORT` override in `serve.go` would win)
+
+  `playwright.config.ts`: `webServer.command='bash e2e/run-env.sh'`, `url='http://localhost:3999'`, `reuseExistingServer: !process.env.CI`, `use.baseURL`, downloads acceptance.
 
 - [ ] **Step 1: Spec first** — `export-import-roundtrip.spec.ts`: create group "E2E Group" via UI → create API `POST /users` with note → add nested request params via the parameters editor → export dialog select group + format `json` → capture `page.waitForEvent('download')`, save to temp, `JSON.parse` assert `format/version/groups[0].apis[0]` → delete group via UI → import the file through ImportDialog → preview shows `groupsCreated: 1` → confirm → sidebar shows group again; open API view, assert note + param tree.
 - [ ] **Step 2: Run** `bunx playwright install chromium && bun run test:e2e` → FAIL (no harness).
@@ -395,15 +404,18 @@ export async function importDocument(file: File, dryRun: boolean): Promise<ApiRe
 ### Task 17: Coverage target + CI workflow
 
 **Files:**
-- Modify: `backend/Makefile` (add `test-coverage` to `.PHONY` and target: `go test ./... -race -covermode=atomic -coverprofile=coverage.out` + `go tool cover -func`)
+- Modify: `backend/Makefile` (add `test-coverage` to `.PHONY`; target runs `go test ./... -race -covermode=atomic -coverprofile=coverage.out`, then `go tool cover -func=coverage.out`, then a **failing threshold check** so the gate is real:)
+  ```
+  @go tool cover -func=coverage.out | grep -E '(param_node|export_knot|export_openapi|export_postman|import_)' | awk '{gsub(/%/,"",$$NF); if ($$NF+0 < 85.0) { print "COVERAGE GATE FAIL:", $$1, $$NF"%"; f=1 }} END { exit f }'
+  ```
 - Create: `.github/workflows/ci.yml`
 
 **Interfaces:**
 - Consumes: everything above.
-- Produces: CI on `push` (main) + `pull_request`: job `backend` (Go 1.25 via `go-version-file: backend/go.mod`, `make test-coverage`, upload coverage artifact); job `frontend` (`oven-sh/setup-bun`, `bun install`, `bun run check`, `bun run test`, `bun run build`); job `e2e` (needs backend+frontend build: install chromium, build embedded binary, `bun run test:e2e`, upload `frontend/test-results/` on failure).
+- Produces: CI on `push` (main) + `pull_request`: job `backend` (Go via `go-version-file: backend/go.mod`, `make test-coverage`, upload coverage artifact); job `frontend` (`oven-sh/setup-bun`, `bun install`, `bun run check`, `bunx vitest run`, `bunx vitest run --coverage`, `bun run build`); job `e2e` (needs backend+frontend: install chromium, build embedded binary via the Task 15 sequence, `bun run test:e2e`, upload `frontend/test-results/` on failure).
 
 - [ ] **Step 1: Write ci.yml** following `release.yml` conventions (actions/checkout@v4, setup-go@v5, setup-bun@v1).
-- [ ] **Step 2: Verify locally** — `cd backend && make test-coverage` passes and reports the new files ≥ 85%; `bun run check && bun run test && bun run build` in `frontend/` pass; `bun run test:e2e` passes. Fix any gaps found (this is the coverage gate moment).
+- [ ] **Step 2: Verify locally** — `cd backend && make test-coverage` passes **including the 85% gate**; `bun run check && bunx vitest run && bunx vitest run --coverage && bun run build` in `frontend/` pass; `bun run test:e2e` passes. Fix any gaps found (this is the coverage gate moment).
 - [ ] **Step 3: Validate workflow syntax** — `gh workflow list` after push, or `actionlint` if available; at minimum `python3 -c "import yaml,sys;yaml.safe_load(open('.github/workflows/ci.yml'))"`.
 - [ ] **Step 4: Commit** `ci: add test and E2E workflow with coverage reporting`
 
@@ -421,7 +433,7 @@ export async function importDocument(file: File, dryRun: boolean): Promise<ApiRe
 ### Task 19: Release template (in-PR part)
 
 **Files:**
-- Modify: `.github/workflows/release.yml` (replace the bilingual `body:` with the English major-OSS template: `## Highlights`, `## What's Changed` (Features / Tests / CI & Release groups), `## Full Changelog` (`https://github.com/ProjAnvil/knot/compare/v0.5.0...${{ github.ref_name }}`), `## Downloads` asset table + checksums note). Asset list and build steps unchanged.
+- Modify: `.github/workflows/release.yml` (replace the bilingual `body:` with the English major-OSS template: `## Highlights`, `## What's Changed` (Features / Tests / CI & Release groups), `## New Contributors` (placeholder section, kept even if empty), `## Full Changelog` (`https://github.com/ProjAnvil/knot/compare/v0.5.0...${{ github.ref_name }}`), `## Downloads` asset table + checksums note). Asset list and build steps unchanged.
 
 **Interfaces:** none (tag mechanics stay identical).
 
@@ -436,5 +448,5 @@ export async function importDocument(file: File, dryRun: boolean): Promise<ApiRe
 1. Confirm CI green on `main`.
 2. `git tag v0.6.0 && git push origin v0.6.0` → `release.yml` builds 12 binaries + `checksums.txt` and creates the release with the Task 19 template.
 3. Wait for workflow: `gh run watch` (tag run).
-4. Enrich notes if needed: render `docs/superpowers/plans/release-notes-v0.6.0.md` (English, per template) → `gh release edit v0.6.0 --notes-file ...`.
+4. Enrich notes if needed: author `docs/superpowers/plans/release-notes-v0.6.0.md` at release time (English, per template — no task creates it) → `gh release edit v0.6.0 --notes-file ...`.
 5. Verify: `gh release view v0.6.0 --json assets,body` — 13 assets, English body.

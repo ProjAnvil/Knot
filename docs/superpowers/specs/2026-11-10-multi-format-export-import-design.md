@@ -136,10 +136,14 @@ OpenAPI codec for kin-openapi is localized to one file.
 
 | format  | Content-Type       | Filename                    |
 |---------|--------------------|-----------------------------|
-| html    | text/html          | `api-docs-<unixts>.html`    |
+| html    | text/html          | `api-docs.html` (unchanged, byte-compat) |
 | json    | application/json   | `knot-export-<unixts>.json` |
 | openapi | application/json   | `openapi-<unixts>.json`     |
 | postman | application/json   | `postman-<unixts>.json`     |
+
+The HTML row is the current behavior verbatim (the handler today sends a
+static `filename="api-docs.html"`); only the three new formats carry a
+server-side timestamp.
 
 All formats share the existing fetch phase (APIs → groups → parameters →
 `[]services.APIWithParams`), so selection semantics and ordering are identical
