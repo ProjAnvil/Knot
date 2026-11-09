@@ -11,6 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Note: backend/go.mod's committed `replace github.com/ProjAnvil/knot/models => ../models` is what makes module-mode (GOWORK=off) resolution of the models module possible pre-tag.
   backend:
     name: Backend tests
     runs-on: ubuntu-latest
@@ -35,6 +36,72 @@ jobs:
         with:
           name: backend-coverage
           path: backend/coverage.out
+
+  models:
+    name: Models module
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          # GOTOOLCHAIN may auto-download the go.work toolchain version
+          # (newer than models/go.mod's); that is acceptable.
+          go-version-file: models/go.mod
+
+      - name: Build and test
+        working-directory: models
+        run: go build ./... && go test ./... -race
+
+      - name: Coverage gate
+        working-directory: models
+        run: make test-coverage
+
+      # Drift lock: regenerate the goldens from the repo root (the ./tools
+      # pattern only resolves there) and fail if committed files change.
+      - name: Check generated goldens for drift
+        working-directory: .
+        run: go run ./tools/cmd/gen-schema && go run ./tools/cmd/gen-ts && git diff --exit-code -- models/schema models/ts
+
+      # Consumption smoke: build a throwaway module outside the workspace and
+      # consume models via a filesystem replace, proving the module graph is
+      # usable with GOWORK=off (i.e. without the go.work workspace).
+      - name: Consumption smoke test
+        run: |
+          SMOKE=$(mktemp -d)
+          cd "$SMOKE"
+          go mod init smoke
+          go mod edit -replace github.com/ProjAnvil/knot/models=${{ github.workspace }}/models
+          cat > main.go <<'EOF'
+          package main
+
+          import (
+            "fmt"
+
+            "github.com/ProjAnvil/knot/models"
+            "github.com/ProjAnvil/knot/models/gormbind"
+          )
+
+          func main() {
+            g := models.Group{Name: "smoke"}
+            fmt.Printf("group=%q valid=%v format=%q migrations=%d\n",
+              g.Name, models.IsValidMethod("GET"), models.WireFormat, len(gormbind.MigrateModels()))
+          }
+          EOF
+          # tidy is REQUIRED: a replace without a require cannot build.
+          GOWORK=off go mod tidy
+          GOWORK=off go build ./... && GOWORK=off ./smoke
+
+      # Upload even when the coverage gate fails so the profile is
+      # available for debugging the failure.
+      - name: Upload coverage profile
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: models-coverage
+          path: models/coverage.out
 
   frontend:
     name: Frontend checks
