@@ -1,6 +1,6 @@
 // API service functions for communicating with backend
 
-import type { Api, ApiData, ApiRawResponse, ApiResult, Group, GroupWithApis, Parameter, ParameterWithChildren } from './types'
+import type { Api, ApiData, ApiRawResponse, ApiResult, ExportFormat, Group, GroupWithApis, ImportPreview, Parameter, ParameterWithChildren } from './types'
 
 const API_BASE = '/api'
 
@@ -368,6 +368,49 @@ export async function getGroups(): Promise<ApiResult<Array<{ id: number; name: s
 	try {
 		const response = await fetch(`${API_BASE}/groups`)
 		return await handleResponse<Array<{ id: number; name: string }>>(response)
+	} catch (error) {
+		return { success: false, error: String(error) }
+	}
+}
+
+// Export/Import API
+export async function exportApis(apiIds: number[], format: ExportFormat): Promise<{ blob: Blob; filename: string } | { error: string }> {
+	try {
+		const response = await fetch(`${API_BASE}/export`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ apiIds, format }),
+		})
+
+		if (!response.ok) {
+			return { error: `HTTP Error: ${response.status} ${response.statusText}` }
+		}
+
+		// Parse the filename from Content-Disposition, tolerating both
+		// quoted ("name.ext") and unquoted (name.ext) forms.
+		const disposition = response.headers.get('Content-Disposition') || ''
+		const match = disposition.match(/filename="?([^";]+)"?/)
+		const filename = match ? match[1] : 'knot-export'
+
+		const blob = await response.blob()
+		return { blob, filename }
+	} catch (error) {
+		return { error: String(error) }
+	}
+}
+
+export async function importDocument(file: File, dryRun: boolean): Promise<ApiResult<ImportPreview>> {
+	try {
+		const formData = new FormData()
+		formData.append('file', file)
+		formData.append('dryRun', String(dryRun))
+
+		// No Content-Type header: the browser must set the multipart boundary itself.
+		const response = await fetch(`${API_BASE}/import`, {
+			method: 'POST',
+			body: formData,
+		})
+		return await handleResponse<ImportPreview>(response)
 	} catch (error) {
 		return { success: false, error: String(error) }
 	}

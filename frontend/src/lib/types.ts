@@ -59,3 +59,16 @@ export interface ApiResult<T = void> {
 	data?: T
 	error?: string
 }
+
+// Export formats supported by the backend export endpoint
+export type ExportFormat = 'html' | 'json' | 'openapi' | 'postman'
+
+// Import preview summary returned by the backend import endpoint
+export interface ImportPreview {
+	format: string
+	groupsCreated: number
+	groupsMerged: number
+	apisImported: number
+	parametersImported: number
+	warnings: string[]
+}

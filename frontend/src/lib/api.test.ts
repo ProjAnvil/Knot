@@ -15,9 +15,11 @@ import {
 	updateApiParametersFromJson,
 	updateApiParametersFromStructure,
 	createApiV2,
-	getGroups
+	getGroups,
+	exportApis,
+	importDocument
 } from './api'
-import type { Group, Api, Parameter, ParameterWithChildren, ApiData, GroupWithApis, ApiRawResponse } from './types'
+import type { Group, Api, Parameter, ParameterWithChildren, ApiData, GroupWithApis, ApiRawResponse, ImportPreview } from './types'
 
 // Mock fetch globally
 const mockFetch = vi.fn()
@@ -931,6 +933,165 @@ describe('API Client - APIs', () => {
 			})
 
 			expect(result.success).toBe(false)
+		})
+	})
+})
+
+describe('API Client - Export/Import', () => {
+	beforeEach(() => {
+		mockFetch.mockClear()
+	})
+
+	afterEach(() => {
+		mockFetch.mockReset()
+	})
+
+	describe('exportApis', () => {
+		it('should post apiIds and format, returning blob and quoted filename', async () => {
+			const blob = new Blob(['{"apis":[]}'], { type: 'application/json' })
+
+			mockFetch.mockResolvedValueOnce({
+				ok: true,
+				headers: {
+					get: (name: string) =>
+						name === 'Content-Disposition' ? 'attachment; filename="knot-export-1699999999.json"' : null
+				},
+				blob: async () => blob
+			} as unknown as Response)
+
+			const result = await exportApis([1, 2, 3], 'json')
+
+			expect(mockFetch).toHaveBeenCalledWith('/api/export', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ apiIds: [1, 2, 3], format: 'json' })
+			})
+			expect(result).toEqual({
+				blob,
+				filename: 'knot-export-1699999999.json'
+			})
+		})
+
+		it('should parse an unquoted filename from Content-Disposition', async () => {
+			const blob = new Blob(['<html></html>'], { type: 'text/html' })
+
+			mockFetch.mockResolvedValueOnce({
+				ok: true,
+				headers: {
+					get: (name: string) =>
+						name === 'Content-Disposition' ? 'attachment; filename=api-docs.html' : null
+				},
+				blob: async () => blob
+			} as unknown as Response)
+
+			const result = await exportApis([1], 'html')
+
+			expect(result).toEqual({
+				blob,
+				filename: 'api-docs.html'
+			})
+		})
+
+		it('should return an error object on non-OK response', async () => {
+			mockFetch.mockResolvedValueOnce({
+				ok: false,
+				status: 500,
+				statusText: 'Internal Server Error'
+			} as unknown as Response)
+
+			const result = await exportApis([1, 2], 'openapi')
+
+			expect(result).toEqual({
+				error: 'HTTP Error: 500 Internal Server Error'
+			})
+		})
+
+		it('should return an error object on network error', async () => {
+			mockFetch.mockRejectedValueOnce(new Error('Network error'))
+
+			const result = await exportApis([1], 'postman')
+
+			expect(result).toEqual({
+				error: 'Error: Network error'
+			})
+		})
+	})
+
+	describe('importDocument', () => {
+		const mockFile = new File(['{"apis":[]}'], 'export.json', { type: 'application/json' })
+
+		const mockPreview: ImportPreview = {
+			format: 'json',
+			groupsCreated: 1,
+			groupsMerged: 0,
+			apisImported: 2,
+			parametersImported: 5,
+			warnings: []
+		}
+
+		it('should post FormData with file and dryRun, returning parsed preview', async () => {
+			mockFetch.mockResolvedValueOnce({
+				ok: true,
+				json: async () => ({ success: true, data: mockPreview })
+			} as Response)
+
+			const result = await importDocument(mockFile, true)
+
+			expect(mockFetch).toHaveBeenCalledTimes(1)
+			const [url, init] = mockFetch.mock.calls[0]
+			expect(url).toBe('/api/import')
+			expect(init.method).toBe('POST')
+			expect(init.body).toBeInstanceOf(FormData)
+			const formData = init.body as FormData
+			expect(formData.get('file')).toBe(mockFile)
+			expect(formData.get('dryRun')).toBe('true')
+			expect(result).toEqual({
+				success: true,
+				data: mockPreview
+			})
+		})
+
+		it('should send dryRun as false string when not a dry run', async () => {
+			mockFetch.mockResolvedValueOnce({
+				ok: true,
+				json: async () => ({ success: true, data: mockPreview })
+			} as Response)
+
+			await importDocument(mockFile, false)
+
+			const init = mockFetch.mock.calls[0][1]
+			const formData = init.body as FormData
+			expect(formData.get('dryRun')).toBe('false')
+		})
+
+		it('should return the error envelope on import failure', async () => {
+			mockFetch.mockResolvedValueOnce({
+				ok: true,
+				json: async () => ({ success: false, error: 'Unsupported format' })
+			} as Response)
+
+			const result = await importDocument(mockFile, false)
+
+			expect(result).toEqual({
+				success: false,
+				error: 'Unsupported format'
+			})
+		})
+
+		it('should handle HTTP error response', async () => {
+			mockFetch.mockResolvedValueOnce({
+				ok: false,
+				status: 400,
+				statusText: 'Bad Request',
+				json: async () => ({})
+			} as Response)
+
+			const result = await importDocument(mockFile, true)
+
+			expect(result).toEqual({
+				success: false,
+				error: 'HTTP Error: 400 Bad Request'
+			})
 		})
 	})
 })
