@@ -195,7 +195,8 @@
     <div class="space-y-2">
       <Textarea
         bind:value={editValue}
-        oninput={(e) => handleChange(e.currentTarget.value)}
+        oninput={(e: Event & { currentTarget: EventTarget & HTMLTextAreaElement }) =>
+          handleChange(e.currentTarget.value)}
         class="font-mono text-sm min-h-[300px] resize-y"
         placeholder="Enter JSON..."
       />

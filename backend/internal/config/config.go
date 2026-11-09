@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 
 	"github.com/spf13/viper"
 )
@@ -129,6 +130,13 @@ func LoadConfig() (*Config, error) {
 	}
 	if v := os.Getenv("KNOT_MYSQL_URL"); v != "" {
 		config.MySQLURL = v
+	}
+	if v := os.Getenv("KNOT_PORT"); v != "" {
+		port, err := strconv.Atoi(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid KNOT_PORT value %q: must be a valid port number: %w", v, err)
+		}
+		config.Port = port
 	}
 
 	return &config, nil

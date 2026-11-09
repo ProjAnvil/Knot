@@ -184,6 +184,7 @@ func GenerateExampleJSON(params []models.Parameter) map[string]interface{} {
 type APIWithParams struct {
 	API                models.API
 	GroupName          string
+	GroupOrder         int
 	RequestParameters  []models.Parameter
 	ResponseParameters []models.Parameter
 }

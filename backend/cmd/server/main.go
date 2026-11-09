@@ -35,7 +35,9 @@ func main() {
 		logger.Log.Fatal(fmt.Sprintf("Failed to initialize database: %v", err))
 	}
 
-	app := fiber.New(fiber.Config{AppName: "Knot"})
+	// BodyLimit is raised to 10 MB so multi-format import files fit within
+	// Fiber's request body cap (the default is 4 MB).
+	app := fiber.New(fiber.Config{AppName: "Knot", BodyLimit: 10 * 1024 * 1024})
 	app.Use(recover.New())
 	// Negotiate gzip/deflate/brotli. The API payloads are highly repetitive JSON
 	// (the sidebar list is ~84 KB uncompressed, ~14 KB gzipped), so compression

@@ -12,6 +12,14 @@ dist
 dist-ssr
 *.local
 
+# Test coverage (vitest --coverage)
+coverage
+
+# Playwright E2E artifacts
+e2e/bin/
+playwright-report/
+test-results/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

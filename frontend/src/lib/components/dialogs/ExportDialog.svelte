@@ -1,11 +1,12 @@
 <script lang="ts">
-  import { ChevronDown, ChevronRight, Download, FileDown } from '@lucide/svelte'
+  import { Braces, ChevronDown, ChevronRight, Download, FileCode, FileDown, FileText, Send } from '@lucide/svelte'
   import { toast } from 'svelte-sonner'
   import { _ } from 'svelte-i18n'
   import Button from '../ui/button.svelte'
   import Checkbox from '../ui/checkbox.svelte'
   import Dialog from '../ui/dialog.svelte'
-  import type { GroupWithApis } from '$lib/types'
+  import { exportApis } from '$lib/api'
+  import type { ExportFormat, GroupWithApis } from '$lib/types'
 
   let {
     groups
@@ -13,9 +14,19 @@
     groups: GroupWithApis[]
   } = $props()
 
-  const API_BASE = '/api'
+  // Available export formats with icon and i18n keys
+  const FORMATS: Array<{
+    id: ExportFormat
+    icon: typeof FileCode | typeof Braces | typeof FileText | typeof Send
+  }> = [
+    { id: 'html', icon: FileCode },
+    { id: 'json', icon: Braces },
+    { id: 'openapi', icon: FileText },
+    { id: 'postman', icon: Send }
+  ]
 
   let open = $state(false)
+  let format = $state<ExportFormat>('html')
   let selectedGroups = $state<Set<number>>(new Set())
   let selectedApis = $state<Set<number>>(new Set())
   let expandedGroups = $state<Set<number>>(new Set())
@@ -105,25 +116,20 @@
     isExporting = true
 
     try {
-      const response = await fetch(`${API_BASE}/export`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          apiIds: Array.from(selectedApis),
-        }),
-      })
+      const result = await exportApis(Array.from(selectedApis), format)
 
-      if (!response.ok) {
-        throw new Error('Export failed')
+      if ('error' in result) {
+        throw new Error(result.error)
       }
 
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
+      // Prefer the server-provided filename; fall back to a generated one
+      const extension = format === 'html' ? 'html' : 'json'
+      const filename = result.filename || `api-docs-${Date.now()}.${extension}`
+
+      const url = window.URL.createObjectURL(result.blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `api-docs-${Date.now()}.html`
+      a.download = filename
       document.body.appendChild(a)
       a.click()
       window.URL.revokeObjectURL(url)
@@ -151,6 +157,38 @@
   <div class="space-y-4">
     <div class="space-y-2">
       <h2 class="text-lg font-semibold">{$_('export.selectItems')}</h2>
+    </div>
+
+    <!-- Format picker -->
+    <div class="space-y-2">
+      <span class="text-sm font-medium">{$_('export.formatLabel')}</span>
+      <div class="grid grid-cols-2 gap-2" role="radiogroup" aria-label={$_('export.formatLabel')}>
+        {#each FORMATS as fmt (fmt.id)}
+          <label
+            data-testid="export-format-{fmt.id}"
+            for="export-format-{fmt.id}"
+            class="flex cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors hover:bg-muted {format === fmt.id ? 'border-primary bg-muted' : 'border-input'}"
+          >
+            <input
+              id="export-format-{fmt.id}"
+              type="radio"
+              name="export-format"
+              value={fmt.id}
+              bind:group={format}
+              class="mt-0.5"
+            />
+            <fmt.icon class="h-4 w-4 shrink-0 mt-0.5" />
+            <span class="space-y-0.5">
+              <span class="block text-sm font-medium leading-none">
+                {$_(`export.format.${fmt.id}`)}
+              </span>
+              <span class="block text-xs text-muted-foreground">
+                {$_(`export.format.${fmt.id}.desc`)}
+              </span>
+            </span>
+          </label>
+        {/each}
+      </div>
     </div>
 
     <!-- Action buttons -->
@@ -227,7 +265,7 @@
         class="gap-2"
       >
         <FileDown class="h-4 w-4" />
-        {isExporting ? $_('export.exporting') : $_('export.exportHtml')}
+        {isExporting ? $_('export.exporting') : $_('export.confirm')}
       </Button>
     </div>
   </div>

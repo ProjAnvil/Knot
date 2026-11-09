@@ -23,6 +23,7 @@ Knot is a comprehensive API documentation platform that helps teams organize, do
 - 📝 **Rich Documentation** - Document APIs with markdown, request/response schemas, and examples
 - 🎨 **Syntax Highlighting** - Beautiful JSON syntax highlighting with dark mode support
 - 🔄 **Drag & Drop Interface** - Intuitive API reordering and organization
+- 📦 **Multi-Format Export & Import** - Export to HTML, Knot JSON, OpenAPI 3.1, or Postman Collection; import Knot JSON, Postman, and OpenAPI files with a preview before applying
 - 🌐 **Multilingual** - Built-in support for English and Chinese
 - 🗄️ **Flexible Database** - Choose between SQLite, PostgreSQL, or MySQL
 - 🤖 **AI Integration** - Native MCP server for Claude and other AI assistants
@@ -95,6 +96,19 @@ knot help
 
 The web interface will be available at [http://localhost:3000](http://localhost:3000)
 
+### Export & Import
+
+In the web UI, **Export** downloads the APIs you select in the format of your
+choice: **HTML** (styled, self-contained documentation), **Knot JSON**
+(lossless backup), **OpenAPI 3.1**, or **Postman Collection v2.1**. **Import**
+accepts Knot JSON, Postman Collection (v2.0/v2.1), and OpenAPI 3.x files — the
+format is detected automatically, and a preview shows how many groups will be
+created or merged and how many APIs and parameters will be imported before
+anything is written. Importing a group whose name already exists merges into it
+(APIs are appended); otherwise a new group is created. RPC-type APIs are
+exported to OpenAPI/Postman as POST operations with an `x-knot-type: rpc`
+marker, so they round-trip correctly.
+
 ## Docker Deployment
 
 The frontend is embedded into the backend binary at image build time, so a
@@ -141,6 +155,9 @@ Example configuration:
   "enableLogging": false
 }
 ```
+
+The `KNOT_PORT` environment variable overrides the config file port; a
+legacy `PORT` environment variable, when set, takes precedence over both.
 
 ### Database Options
 
@@ -408,7 +425,7 @@ We welcome contributions! Here's how you can help:
 
 ## Roadmap
 
-- [ ] OpenAPI/Swagger import/export
+- [x] OpenAPI/Swagger import/export
 - [ ] API versioning support
 - [ ] Team collaboration features
 - [ ] API testing interface

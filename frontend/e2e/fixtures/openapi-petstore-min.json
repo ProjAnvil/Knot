@@ -1,0 +1,91 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "E2E Petstore Mini",
+    "version": "1.0.0"
+  },
+  "tags": [
+    {
+      "name": "pets"
+    }
+  ],
+  "paths": {
+    "/pets": {
+      "get": {
+        "tags": ["pets"],
+        "summary": "List pets",
+        "operationId": "listPets",
+        "responses": {
+          "200": {
+            "description": "A paged array of pets",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["id", "name"],
+                    "properties": {
+                      "id": { "type": "number" },
+                      "name": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["pets"],
+        "summary": "Create pet",
+        "operationId": "createPet",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Pet"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The created pet"
+          }
+        }
+      }
+    },
+    "/pets/search": {
+      "post": {
+        "tags": ["pets"],
+        "summary": "Fetch pets batch",
+        "operationId": "fetchPetsBatch",
+        "description": "RPC-style batch fetch without an HTTP verb.",
+        "x-knot-type": "rpc",
+        "responses": {
+          "200": {
+            "description": "The matching pets"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Pet": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "tag": { "type": "string" },
+          "status": {
+            "type": "string",
+            "description": "pet status in the store"
+          }
+        }
+      }
+    }
+  }
+}

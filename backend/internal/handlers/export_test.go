@@ -42,6 +42,26 @@ func setupExportTestApp(db *gorm.DB) *fiber.App {
 	return app
 }
 
+// createExportAPIWithGroup seeds one group (with a non-zero order so the
+// GroupOrder carry-through is observable) and one API, returning the API.
+func createExportAPIWithGroup(t *testing.T, db *gorm.DB) models.API {
+	t.Helper()
+
+	group := models.Group{Name: "Test Group", Order: 2}
+	require.NoError(t, db.Create(&group).Error)
+
+	api := models.API{
+		GroupID:  group.ID,
+		Name:     "Test API",
+		Endpoint: "/test",
+		Method:   "GET",
+		Type:     "HTTP",
+	}
+	require.NoError(t, db.Create(&api).Error)
+
+	return api
+}
+
 // TestExportAPIs tests the ExportAPIs handler
 func TestExportAPIs(t *testing.T) {
 	t.Run("givenValidAPIIDs_whenExportAPIs_thenReturnsHTMLDocument", func(t *testing.T) {
@@ -442,5 +462,170 @@ func TestExportAPIs(t *testing.T) {
 		// Should be English
 		assert.Contains(t, html, "lang=\"en\"")
 		assert.True(t, strings.Contains(html, "API Documentation") || strings.Contains(html, "Request Parameters"))
+	})
+
+	t.Run("givenNoFormatField_whenExport_thenHTMLIdenticalBehavior", func(t *testing.T) {
+		// Arrange
+		db := setupTestDB(t)
+		app := setupExportTestApp(db)
+		api := createExportAPIWithGroup(t, db)
+
+		body := map[string][]uint{
+			"apiIds": {api.ID},
+		}
+		jsonBody, _ := json.Marshal(body)
+
+		// Act
+		req := httptest.NewRequest("POST", "/api/export", bytes.NewReader(jsonBody))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+
+		// Assert - exact current header values (backward compatibility)
+		assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+		assert.Equal(t, "text/html; charset=utf-8", resp.Header.Get("Content-Type"))
+		assert.Equal(t, `attachment; filename="api-docs.html"`, resp.Header.Get("Content-Disposition"))
+
+		// Body is still the HTML document
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		html := string(bodyBytes)
+		assert.Contains(t, html, "<!DOCTYPE html>")
+		assert.Contains(t, html, "Test API")
+	})
+
+	t.Run("givenFormatJSON_whenExport_thenKnotEnvelope", func(t *testing.T) {
+		// Arrange
+		db := setupTestDB(t)
+		app := setupExportTestApp(db)
+		api := createExportAPIWithGroup(t, db)
+
+		body := map[string]interface{}{
+			"apiIds": []uint{api.ID},
+			"format": "json",
+		}
+		jsonBody, _ := json.Marshal(body)
+
+		// Act
+		req := httptest.NewRequest("POST", "/api/export", bytes.NewReader(jsonBody))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+
+		// Assert
+		assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+		assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
+		require.Regexp(t, `^attachment; filename="knot-export-\d+\.json"$`, resp.Header.Get("Content-Disposition"))
+
+		var doc struct {
+			Format  string `json:"format"`
+			Version int    `json:"version"`
+			Groups  []struct {
+				Name  string `json:"name"`
+				Order int    `json:"order"`
+			} `json:"groups"`
+		}
+		err = json.NewDecoder(resp.Body).Decode(&doc)
+		require.NoError(t, err)
+
+		assert.Equal(t, "knot", doc.Format)
+		assert.Equal(t, 1, doc.Version)
+		require.Len(t, doc.Groups, 1)
+		// Group order is carried through from the fetched group row
+		assert.Equal(t, 2, doc.Groups[0].Order)
+	})
+
+	t.Run("givenFormatOpenAPI_whenExport_thenOpenAPIEnvelope", func(t *testing.T) {
+		// Arrange
+		db := setupTestDB(t)
+		app := setupExportTestApp(db)
+		api := createExportAPIWithGroup(t, db)
+
+		body := map[string]interface{}{
+			"apiIds": []uint{api.ID},
+			"format": "openapi",
+		}
+		jsonBody, _ := json.Marshal(body)
+
+		// Act
+		req := httptest.NewRequest("POST", "/api/export", bytes.NewReader(jsonBody))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+
+		// Assert
+		assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+		assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
+		require.Regexp(t, `^attachment; filename="openapi-\d+\.json"$`, resp.Header.Get("Content-Disposition"))
+
+		var doc struct {
+			OpenAPI string `json:"openapi"`
+		}
+		err = json.NewDecoder(resp.Body).Decode(&doc)
+		require.NoError(t, err)
+
+		assert.Equal(t, "3.1.0", doc.OpenAPI)
+	})
+
+	t.Run("givenFormatPostman_whenExport_thenPostmanEnvelope", func(t *testing.T) {
+		// Arrange
+		db := setupTestDB(t)
+		app := setupExportTestApp(db)
+		api := createExportAPIWithGroup(t, db)
+
+		body := map[string]interface{}{
+			"apiIds": []uint{api.ID},
+			"format": "postman",
+		}
+		jsonBody, _ := json.Marshal(body)
+
+		// Act
+		req := httptest.NewRequest("POST", "/api/export", bytes.NewReader(jsonBody))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+
+		// Assert
+		assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+		assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
+		require.Regexp(t, `^attachment; filename="postman-\d+\.json"$`, resp.Header.Get("Content-Disposition"))
+
+		var doc struct {
+			Info struct {
+				Schema string `json:"schema"`
+			} `json:"info"`
+		}
+		err = json.NewDecoder(resp.Body).Decode(&doc)
+		require.NoError(t, err)
+
+		assert.Contains(t, doc.Info.Schema, "schema.getpostman.com")
+	})
+
+	t.Run("givenUnknownFormat_whenExport_then400", func(t *testing.T) {
+		// Arrange
+		db := setupTestDB(t)
+		app := setupExportTestApp(db)
+		api := createExportAPIWithGroup(t, db)
+
+		body := map[string]interface{}{
+			"apiIds": []uint{api.ID},
+			"format": "yaml",
+		}
+		jsonBody, _ := json.Marshal(body)
+
+		// Act
+		req := httptest.NewRequest("POST", "/api/export", bytes.NewReader(jsonBody))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+
+		// Assert
+		assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
+
+		var respBody response.Response
+		err = json.NewDecoder(resp.Body).Decode(&respBody)
+		require.NoError(t, err)
+
+		assert.False(t, respBody.Success)
+		assert.Contains(t, respBody.Error, "Unsupported export format")
 	})
 }

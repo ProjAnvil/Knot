@@ -23,6 +23,7 @@ Knot 是一个全面的 API 文档管理平台，帮助团队组织、记录和�
 - 📝 **丰富的文档** - 使用 Markdown、请求/响应模式和示例记录 API
 - 🎨 **语法高亮** - 优美的 JSON 语法高亮，支持深色模式
 - 🔄 **拖放界面** - 直观的 API 重新排序和组织方式
+- 📦 **多格式导入导出** - 导出为 HTML、Knot JSON、OpenAPI 3.1 或 Postman 集合；导入 Knot JSON、Postman、OpenAPI 文件，应用前可预览
 - 🌐 **多语言支持** - 内置英文和中文支持
 - 🗄️ **灵活的数据库** - 可选择 SQLite、PostgreSQL 或 MySQL
 - 🤖 **AI 集成** - 为 Claude 等 AI 助手提供原生 MCP 服务器
@@ -93,6 +94,10 @@ knot help
 
 Web 界面将在 [http://localhost:3000](http://localhost:3000) 可用
 
+### 导入导出
+
+在 Web 界面中，**导出** 会按您选择的格式下载选中的 API：**HTML**（带样式的独立文档）、**Knot JSON**（无损备份）、**OpenAPI 3.1** 或 **Postman 集合 v2.1**。**导入** 支持 Knot JSON、Postman 集合（v2.0/v2.1）和 OpenAPI 3.x 文件 —— 格式自动检测，确认前会预览将新建或合并多少分组、导入多少 API 和参数，确认后才会写入。与现有分组同名的导入分组会合并进去（API 追加到该分组），否则创建新分组。RPC 类型的 API 导出为 OpenAPI/Postman 时会表示为带 `x-knot-type: rpc` 标记的 POST 操作，可正确往返还原。
+
 ## 文档
 
 - [中文文档](./README_zh.md)（本文件）
@@ -118,6 +123,8 @@ Knot 的配置文件存储位置：
   "enableLogging": false
 }
 ```
+
+`KNOT_PORT` 环境变量会覆盖配置文件中的端口；若设置了旧版 `PORT` 环境变量，则它的优先级高于前两者。
 
 ### 数据库选项
 
@@ -385,12 +392,12 @@ make build-all
 
 ## 路线图
 
-- [ ] OpenAPI/Swagger 导入/导出
+- [x] OpenAPI/Swagger 导入/导出
 - [ ] API 版本控制支持
 - [ ] 团队协作功能
 - [ ] API 测试界面
 - [ ] GraphQL 支持
-- [ ] Docker 部署
+- [x] Docker 部署
 - [ ] 云托管选项
 - [ ] 插件系统
 

@@ -1,4 +1,4 @@
-.PHONY: build build-all clean run test deps fmt lint setup package package-all package-cli package-cli-all package-server package-server-all
+.PHONY: build build-all clean run test test-coverage deps fmt lint setup package package-all package-cli package-cli-all package-server package-server-all
 
 # Build flags for size optimization
 # -s: omit symbol table and debug info
@@ -48,6 +48,25 @@ clean:
 # Run tests
 test:
 	@go test -v ./...
+
+# Run tests with race detector and coverage, then enforce the 85% gate on
+# the new export/import code: the services files matched by
+# param_node/export_knot/export_openapi/export_postman/import_ plus the
+# handlers/import.go and handlers/export.go files (their names lack the
+# underscore, so they are listed explicitly). Exits non-zero if any
+# function in a gated file is below 85.0%, or if the grep pattern matches
+# nothing at all (e.g. the gated files were renamed) so the gate can never
+# pass vacuously.
+test-coverage:
+	@go test ./... -race -covermode=atomic -coverprofile=coverage.out
+	@func_report=$$(go tool cover -func=coverage.out); \
+	printf '%s\n' "$$func_report"; \
+	gated=$$(printf '%s\n' "$$func_report" | grep -E '(param_node|export_knot|export_openapi|export_postman|import_|handlers/import\.go|handlers/export\.go)'); \
+	if [ -z "$$gated" ]; then \
+		echo "COVERAGE GATE FAIL: no functions matched the gated-file pattern (renamed or missing files?)"; \
+		exit 1; \
+	fi; \
+	printf '%s\n' "$$gated" | awk '{gsub(/%/,"",$$NF); if ($$NF+0 < 85.0) { print "COVERAGE GATE FAIL:", $$1, $$NF"%"; f=1 }} END { exit f }'
 
 # Install dependencies
 deps:
