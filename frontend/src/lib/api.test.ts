@@ -23,7 +23,7 @@ import type { Group, Api, Parameter, ParameterWithChildren, ApiData, GroupWithAp
 
 // Mock fetch globally
 const mockFetch = vi.fn()
-global.fetch = mockFetch
+vi.stubGlobal('fetch', mockFetch)
 
 describe('API Client - Groups', () => {
 	beforeEach(() => {
@@ -62,7 +62,7 @@ describe('API Client - Groups', () => {
 			mockFetch.mockResolvedValueOnce({
 				ok: true,
 				json: async () => ({ success: true, data: mockGroups })
-			} as Response)
+			} as unknown as Response)
 
 			const result = await getGroupsWithApis()
 
@@ -79,7 +79,7 @@ describe('API Client - Groups', () => {
 				status: 500,
 				statusText: 'Internal Server Error',
 				json: async () => ({})
-			} as Response)
+			} as unknown as Response)
 
 			const result = await getGroupsWithApis()
 
@@ -106,7 +106,7 @@ describe('API Client - Groups', () => {
 				json: async () => {
 					throw new Error('Invalid JSON')
 				}
-			} as Response)
+			} as unknown as Response)
 
 			const result = await getGroupsWithApis()
 
@@ -129,7 +129,7 @@ describe('API Client - Groups', () => {
 			mockFetch.mockResolvedValueOnce({
 				ok: true,
 				json: async () => ({ success: true, data: mockGroup })
-			} as Response)
+			} as unknown as Response)
 
 			const result = await createGroup('New Group')
 
@@ -150,7 +150,7 @@ describe('API Client - Groups', () => {
 				status: 400,
 				statusText: 'Bad Request',
 				json: async () => ({})
-			} as Response)
+			} as unknown as Response)
 
 			const result = await createGroup('')
 
@@ -171,7 +171,7 @@ describe('API Client - Groups', () => {
 			mockFetch.mockResolvedValueOnce({
 				ok: true,
 				json: async () => ({ success: true, data: mockGroup })
-			} as Response)
+			} as unknown as Response)
 
 			const result = await renameGroup(1, 'Updated Group Name')
 
@@ -192,7 +192,7 @@ describe('API Client - Groups', () => {
 				status: 404,
 				statusText: 'Not Found',
 				json: async () => ({})
-			} as Response)
+			} as unknown as Response)
 
 			const result = await renameGroup(999, 'New Name')
 
@@ -205,7 +205,7 @@ describe('API Client - Groups', () => {
 			mockFetch.mockResolvedValueOnce({
 				ok: true,
 				json: async () => ({ success: true })
-			} as Response)
+			} as unknown as Response)
 
 			const result = await deleteGroup(1)
 
@@ -221,7 +221,7 @@ describe('API Client - Groups', () => {
 				status: 404,
 				statusText: 'Not Found',
 				json: async () => ({})
-			} as Response)
+			} as unknown as Response)
 
 			const result = await deleteGroup(999)
 
@@ -239,7 +239,7 @@ describe('API Client - Groups', () => {
 			mockFetch.mockResolvedValueOnce({
 				ok: true,
 				json: async () => ({ success: true, data: mockGroups })
-			} as Response)
+			} as unknown as Response)
 
 			const result = await getGroups()
 
@@ -256,7 +256,7 @@ describe('API Client - Groups', () => {
 			mockFetch.mockResolvedValueOnce({
 				ok: true,
 				json: async () => ({ success: true })
-			} as Response)
+			} as unknown as Response)
 
 			const orders = [
 				{ id: 1, order: 0 },
@@ -279,7 +279,7 @@ describe('API Client - Groups', () => {
 				status: 400,
 				statusText: 'Bad Request',
 				json: async () => ({})
-			} as Response)
+			} as unknown as Response)
 
 			const result = await updateGroupOrders([{ id: 1, order: 0 }])
 
@@ -370,7 +370,7 @@ describe('API Client - APIs', () => {
 			mockFetch.mockResolvedValueOnce({
 				ok: true,
 				json: async () => ({ success: true, data: mockRawResponse })
-			} as Response)
+			} as unknown as Response)
 
 			const result = await getApi(1)
 
@@ -389,7 +389,7 @@ describe('API Client - APIs', () => {
 				status: 404,
 				statusText: 'Not Found',
 				json: async () => ({})
-			} as Response)
+			} as unknown as Response)
 
 			const result = await getApi(999)
 
@@ -448,7 +448,7 @@ describe('API Client - APIs', () => {
 			mockFetch.mockResolvedValueOnce({
 				ok: true,
 				json: async () => ({ success: true, data: mockRawResponse })
-			} as Response)
+			} as unknown as Response)
 
 			const result = await getApi(1)
 
@@ -481,7 +481,7 @@ describe('API Client - APIs', () => {
 			mockFetch.mockResolvedValueOnce({
 				ok: true,
 				json: async () => ({ success: true, data: mockApi })
-			} as Response)
+			} as unknown as Response)
 
 			const result = await createApi({
 				name: 'New API',
@@ -527,7 +527,7 @@ describe('API Client - APIs', () => {
 			mockFetch.mockResolvedValueOnce({
 				ok: true,
 				json: async () => ({ success: true, data: mockApi })
-			} as Response)
+			} as unknown as Response)
 
 			const result = await updateApi(1, {
 				name: 'Updated API',
@@ -556,7 +556,7 @@ describe('API Client - APIs', () => {
 			mockFetch.mockResolvedValueOnce({
 				ok: true,
 				json: async () => ({ success: true })
-			} as Response)
+			} as unknown as Response)
 
 			const result = await deleteApi(1)
 
@@ -572,7 +572,7 @@ describe('API Client - APIs', () => {
 				status: 404,
 				statusText: 'Not Found',
 				json: async () => ({})
-			} as Response)
+			} as unknown as Response)
 
 			const result = await deleteApi(999)
 
@@ -598,7 +598,7 @@ describe('API Client - APIs', () => {
 			mockFetch.mockResolvedValueOnce({
 				ok: true,
 				json: async () => ({ success: true, data: mockDuplicatedApi })
-			} as Response)
+			} as unknown as Response)
 
 			const result = await duplicateApi(1)
 
@@ -617,7 +617,7 @@ describe('API Client - APIs', () => {
 				status: 404,
 				statusText: 'Not Found',
 				json: async () => ({})
-			} as Response)
+			} as unknown as Response)
 
 			const result = await duplicateApi(999)
 
@@ -644,7 +644,7 @@ describe('API Client - APIs', () => {
 				json: async () => {
 					throw new Error('Invalid JSON')
 				}
-			} as Response)
+			} as unknown as Response)
 
 			const result = await duplicateApi(1)
 
@@ -660,7 +660,7 @@ describe('API Client - APIs', () => {
 			mockFetch.mockResolvedValueOnce({
 				ok: true,
 				json: async () => ({ success: true })
-			} as Response)
+			} as unknown as Response)
 
 			const orders = [
 				{ id: 1, order: 0 },
@@ -683,7 +683,7 @@ describe('API Client - APIs', () => {
 			mockFetch.mockResolvedValueOnce({
 				ok: true,
 				json: async () => ({ success: true })
-			} as Response)
+			} as unknown as Response)
 
 			const jsonData = { username: 'string', age: 'number' }
 
@@ -710,7 +710,7 @@ describe('API Client - APIs', () => {
 			mockFetch.mockResolvedValueOnce({
 				ok: true,
 				json: async () => ({ success: true, data: { count: 2 } })
-			} as Response)
+			} as unknown as Response)
 
 			const parameters: ParameterWithChildren[] = [
 				{
@@ -768,19 +768,19 @@ describe('API Client - APIs', () => {
 						updatedAt: '2024-01-01T00:00:00Z'
 					}
 				})
-			} as Response)
+			} as unknown as Response)
 
 			// Mock update request parameters call
 			mockFetch.mockResolvedValueOnce({
 				ok: true,
 				json: async () => ({ success: true, data: { count: 2 } })
-			} as Response)
+			} as unknown as Response)
 
 			// Mock update response parameters call
 			mockFetch.mockResolvedValueOnce({
 				ok: true,
 				json: async () => ({ success: true, data: { count: 1 } })
-			} as Response)
+			} as unknown as Response)
 
 			const result = await createApiV2({
 				groupId: 1,
@@ -824,7 +824,7 @@ describe('API Client - APIs', () => {
 						updatedAt: '2024-01-01T00:00:00Z'
 					}
 				})
-			} as Response)
+			} as unknown as Response)
 
 			// Mock failed request parameters call
 			mockFetch.mockResolvedValueOnce({
@@ -832,13 +832,13 @@ describe('API Client - APIs', () => {
 				status: 400,
 				statusText: 'Bad Request',
 				json: async () => ({})
-			} as Response)
+			} as unknown as Response)
 
 			// Mock rollback delete call
 			mockFetch.mockResolvedValueOnce({
 				ok: true,
 				json: async () => ({ success: true })
-			} as Response)
+			} as unknown as Response)
 
 			const result = await createApiV2({
 				groupId: 1,
@@ -876,13 +876,13 @@ describe('API Client - APIs', () => {
 						updatedAt: '2024-01-01T00:00:00Z'
 					}
 				})
-			} as Response)
+			} as unknown as Response)
 
 			// Mock successful request parameters call
 			mockFetch.mockResolvedValueOnce({
 				ok: true,
 				json: async () => ({ success: true, data: { count: 1 } })
-			} as Response)
+			} as unknown as Response)
 
 			// Mock failed response parameters call
 			mockFetch.mockResolvedValueOnce({
@@ -890,13 +890,13 @@ describe('API Client - APIs', () => {
 				status: 400,
 				statusText: 'Bad Request',
 				json: async () => ({})
-			} as Response)
+			} as unknown as Response)
 
 			// Mock rollback delete call
 			mockFetch.mockResolvedValueOnce({
 				ok: true,
 				json: async () => ({ success: true })
-			} as Response)
+			} as unknown as Response)
 
 			const result = await createApiV2({
 				groupId: 1,
@@ -922,7 +922,7 @@ describe('API Client - APIs', () => {
 				status: 400,
 				statusText: 'Bad Request',
 				json: async () => ({})
-			} as Response)
+			} as unknown as Response)
 
 			const result = await createApiV2({
 				groupId: 1,
@@ -1033,7 +1033,7 @@ describe('API Client - Export/Import', () => {
 			mockFetch.mockResolvedValueOnce({
 				ok: true,
 				json: async () => ({ success: true, data: mockPreview })
-			} as Response)
+			} as unknown as Response)
 
 			const result = await importDocument(mockFile, true)
 
@@ -1055,7 +1055,7 @@ describe('API Client - Export/Import', () => {
 			mockFetch.mockResolvedValueOnce({
 				ok: true,
 				json: async () => ({ success: true, data: mockPreview })
-			} as Response)
+			} as unknown as Response)
 
 			await importDocument(mockFile, false)
 
@@ -1068,7 +1068,7 @@ describe('API Client - Export/Import', () => {
 			mockFetch.mockResolvedValueOnce({
 				ok: true,
 				json: async () => ({ success: false, error: 'Unsupported format' })
-			} as Response)
+			} as unknown as Response)
 
 			const result = await importDocument(mockFile, false)
 
@@ -1084,7 +1084,7 @@ describe('API Client - Export/Import', () => {
 				status: 400,
 				statusText: 'Bad Request',
 				json: async () => ({})
-			} as Response)
+			} as unknown as Response)
 
 			const result = await importDocument(mockFile, true)
 

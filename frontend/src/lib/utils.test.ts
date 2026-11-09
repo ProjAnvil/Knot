@@ -74,7 +74,7 @@ describe('copyToClipboard', () => {
 		// Mock createElement for fallback tests
 		vi.spyOn(document, 'createElement').mockReturnValue(createMockTextarea())
 		vi.spyOn(document.body, 'appendChild').mockImplementation(() => document.createElement('div'))
-		vi.spyOn(document.body, 'removeChild').mockImplementation(() => {})
+		vi.spyOn(document.body, 'removeChild').mockImplementation((child: Node) => child)
 	})
 
 	afterEach(() => {
