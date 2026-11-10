@@ -223,8 +223,11 @@ func TestCreateGroup(t *testing.T) {
 		groupData := respBody.Data.(map[string]interface{})
 		assert.Equal(t, "New Group", groupData["name"])
 
-		// Note: The response does not include 'order' field due to custom MarshalJSON in Group model
-		// Verify in database instead
+		// The response includes the 'order' field via the custom MarshalJSON in Group model
+		require.Contains(t, groupData, "order")
+		assert.Equal(t, float64(1), groupData["order"])
+
+		// Verify in database as well
 		var group models.Group
 		db.First(&group, 1)
 		assert.Equal(t, "New Group", group.Name)
