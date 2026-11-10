@@ -87,7 +87,7 @@ func main() {
 	defer engine.Close() // no-op: the DB connection belongs to Sentia
 
 	// Mount registers every engine route under /knot/api on Sentia's own
-	// Fiber app. It is idempotent — mounting defensively is safe.
+	// Fiber app. It is idempotent per app — mounting defensively is safe.
 	app := fiber.New()
 	engine.Mount(app)
 
@@ -164,10 +164,11 @@ func (k *Knot) Mount(app *fiber.App)
 ```
 
 Registers all engine routes on the host's app under `Config.APIPrefix`
-(default `/api`). Mount is **idempotent**: a second call is a no-op, so hosts
-can mount defensively. It registers nothing else — static file serving,
-health checks and middleware stay with the host (the standalone server
-registers its own `/api/health` before mounting).
+(default `/api`). Mount is **idempotent per app**: mounting the same app
+twice is a no-op, so hosts can mount defensively, while mounting additional
+apps registers the full route set on each. It registers nothing else —
+static file serving, health checks and middleware stay with the host (the
+standalone server registers its own `/api/health` before mounting).
 
 Mounted routes:
 
@@ -178,6 +179,7 @@ POST   {prefix}/groups                        create group
 POST   {prefix}/groups/orders                 reorder groups
 PATCH  {prefix}/groups/:id                    update group
 DELETE {prefix}/groups/:id                    delete group
+GET    {prefix}/apis                          list APIs (paginated, searchable)
 GET    {prefix}/apis/:id                      get one API
 GET    {prefix}/apis/group/:groupId           APIs of one group
 POST   {prefix}/apis                          create API
@@ -196,6 +198,14 @@ POST   {prefix}/mcp-tools                     MCP tools endpoint
 Responses use the Knot envelope — `{"success":true,"data":...}` on success,
 `{"success":false,"error":"..."}` on failure.
 
+`GET {prefix}/apis` is a flat, paginated listing for search UIs, ordered by
+the parent group's position, then API order. Query parameters: `page`
+(default 1), `pageSize` (default 50, clamped to 1..100), `keyword`
+(case-insensitive substring match on API name or endpoint), `groupId`
+(exact) and `method` (exact, upper-cased before matching). The data payload
+is `{"items":[...],"total":N,"page":N,"pageSize":N}`; non-numeric `page`,
+`pageSize` or `groupId` values fail with a 400.
+
 ### Export
 
 ```go
@@ -209,6 +219,12 @@ the standalone HTML document; `"json"`, `"openapi"` and `"postman"` produce
 the respective JSON documents; anything else fails with
 `ErrUnsupportedFormat`. `locale` selects the HTML document language and
 defaults to `"zh"` when empty. An empty `apiIDs` fails with `ErrNoAPIIDs`.
+
+Two different "format" notions are at play: the `format` argument above is
+a **request** value — `""`, `html`, `json`, `openapi` or `postman` — while
+the Knot JSON document produced by `json` carries `"format":"knot"` in its
+envelope (`models.WireFormat`, the v1 wire-format identifier). `"knot"` is
+not a valid request value.
 
 ### Import
 
@@ -260,8 +276,9 @@ HTTP analog mirrors the standalone server's handlers:
   and nothing else — no drops, no renames, no other schema objects.
 - **One engine instance per process.** The table prefix is process-wide
   state (`models.TablePrefix`); a second engine instance in the same process
-  would silently share it. An engine also mounts at most once — `Mount` is
-  idempotent by design.
+  would silently share it. `Mount` is idempotent per app by design —
+  remounting the same app is a no-op, and each additional app gets its own
+  route registration.
 - **`SetTablePrefix` runs once, before the first database use.**
   `Config.TablePrefix` does this for you (installed before migration, only
   when non-empty). Hosts that call `models.SetTablePrefix` themselves should
