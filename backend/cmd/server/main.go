@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	knot "github.com/ProjAnvil/knot/backend"
 	"github.com/ProjAnvil/knot/backend/internal/config"
 	"github.com/ProjAnvil/knot/backend/internal/database"
 	"github.com/ProjAnvil/knot/backend/internal/embedded"
@@ -73,7 +74,15 @@ func main() {
 		return c.JSON(resp)
 	})
 
-	handlers.SetupRoutes(app, db)
+	// Mount the embeddable engine under the default "/api" prefix. The host
+	// keeps the health endpoint, the static frontend and the process
+	// lifecycle; the engine's Close is a documented no-op, so it is not
+	// deferred here.
+	k, err := knot.New(knot.Config{DB: db, APIPrefix: "/api"})
+	if err != nil {
+		logger.Log.Fatal(fmt.Sprintf("Failed to initialize engine: %v", err))
+	}
+	k.Mount(app)
 
 	// Static file serving for frontend (only if embedded)
 	if embedded.HasFrontend() {
