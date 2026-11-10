@@ -2,7 +2,7 @@
 
 - Date: 2026-11-10
 - Status: Final (small-change scope; fixes verified against code this session)
-- Target releases: `backend/v0.2.0` (engine minor) and `v0.8.0` (product minor). models module: NO release (no schema change).
+- Target releases: `models/v1.2.0` (wire additive minor: Group JSON `order`), then `backend/v0.2.0` (requires models v1.2.0 — its replace is inert downstream), then `v0.8.0` (product minor). No DB schema change; the models bump is a MODULE version bump because fix 3.2 lives in models/group.go.
 
 ## 1. Intent
 
@@ -73,7 +73,7 @@ routes; same app twice still no duplicate registration (route-count check).
 
 ### 3.5 GET /apis — flat list with search (5)
 
-`GET {prefix}/apis` handler `ListAPIs(db)`:
+`GET {prefix}/apis` handler `ListAPIs(db)`. The cross-table ordering MUST join via `(models.Group{}).TableName()` (TablePrefix-correct) and quote the reserved column through `clause.OrderByColumn{Column: clause.Column{Table: groupsTable, Name: "order"}}` — a raw `JOIN groups` string passes prefix-less tests but breaks prefixed hosts. A prefixed (`knot_`) handler test pins this. `LOWER(...) LIKE` with the pattern lowercased IN GO (`"%" + strings.ToLower(kw) + "%"`); LIKE wildcards in the keyword are NOT escaped (documented, consistent with mcp_tools). Moved APIs keep their current `order` value in the destination group. Non-numeric `groupId` param → 400 `"Invalid group ID"`; `page` clamps to ≥1 like pageSize.
 - Query params: `page` (default 1, ≥1), `pageSize` (default 50, clamp 1..100),
   `keyword` (optional; case-insensitive LIKE on name OR endpoint),
   `groupId` (optional exact), `method` (optional exact, upper-cased input).
@@ -98,10 +98,10 @@ models/README.md if it references the value.
 ## 4. Wire-compatibility statement
 
 All wire changes are additive: new optional request field (3.1), new response
-field (3.2), new route (3.5), changed status code only on error paths that
-previously mis-served 500 (3.3). Knot's frontend, existing E2E, and CI smoke
-are unaffected. Product tag `v0.8.0` (minor — new endpoint); engine library
-tag `backend/v0.2.0` (Mount semantic fix + additive API).
+field (3.2 — models v1.2.0), new route (3.5), changed status code only on error
+paths that previously mis-served 500 (3.3). Knot's frontend, existing E2E, and
+CI smoke are unaffected. Tags in strict order: `models/v1.2.0` →
+`backend/v0.2.0` (go.mod requires models v1.2.0) → `v0.8.0`.
 
 ## 5. Testing strategy
 
@@ -114,5 +114,7 @@ real product); CI embedded-host smoke untouched and green.
 ## 6. Execution sequence
 
 spec (this doc) → plan → subagent audit → subagent-driven execution → final
-review → verification → PR → CI → merge → `backend/v0.2.0` → `v0.8.0` via
-gh (English notes; Full Changelog base `v0.7.1`).
+review → verification → PR → CI → merge → `models/v1.2.0` → external smoke
+(marshal shows `order`) → `backend/v0.2.0` → external smoke (two-app Mount,
+GET list, group JSON has order) → `v0.8.0` via gh (English notes; Full
+Changelog base `v0.7.1`).
