@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -310,6 +311,68 @@ func countRoutes(app *fiber.App) int {
 		count += len(stack)
 	}
 	return count
+}
+
+// TestMountPerApp covers per-app mount semantics: every distinct app the
+// engine is mounted on receives the full route set exactly once, while a
+// repeated Mount of the same app stays a no-op even under concurrency.
+func TestMountPerApp(t *testing.T) {
+	t.Run("givenSecondApp_whenMount_thenBothAppsServeFullRouteSet", func(t *testing.T) {
+		db := openTestDB(t)
+		k := mustNew(t, knot.Config{DB: db})
+
+		appA := fiber.New(fiber.Config{DisableStartupMessage: true})
+		appB := fiber.New(fiber.Config{DisableStartupMessage: true})
+		k.Mount(appA)
+		k.Mount(appB)
+
+		// Both apps must serve the engine routes, not just the first one.
+		for i, app := range []*fiber.App{appA, appB} {
+			req := httptest.NewRequest("GET", "/api/groups", nil)
+			resp, err := app.Test(req)
+			require.NoError(t, err, "app %d should serve GET /api/groups", i)
+			assert.Equal(t, fiber.StatusOK, resp.StatusCode, "app %d should serve GET /api/groups with 200", i)
+		}
+
+		// And each app carries the identical route set.
+		assert.Equal(t, countRoutes(appA), countRoutes(appB),
+			"both apps must carry the same route set")
+	})
+
+	t.Run("givenSameAppTwice_whenMount_thenRouteCountUnchanged", func(t *testing.T) {
+		db := openTestDB(t)
+		k := mustNew(t, knot.Config{DB: db})
+
+		app := fiber.New(fiber.Config{DisableStartupMessage: true})
+		k.Mount(app)
+		routesAfterFirst := countRoutes(app)
+
+		k.Mount(app)
+		assert.Equal(t, routesAfterFirst, countRoutes(app),
+			"a second Mount of the same app must not register duplicates")
+	})
+
+	t.Run("givenConcurrentMountsOfSameApp_whenMount_thenSingleRouteSet", func(t *testing.T) {
+		db := openTestDB(t)
+		k := mustNew(t, knot.Config{DB: db})
+
+		app := fiber.New(fiber.Config{DisableStartupMessage: true})
+		var wg sync.WaitGroup
+		for i := 0; i < 8; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				k.Mount(app)
+			}()
+		}
+		wg.Wait()
+
+		// A sequential single Mount on a fresh app defines the expected count.
+		reference := fiber.New(fiber.Config{DisableStartupMessage: true})
+		k.Mount(reference)
+		assert.Equal(t, countRoutes(reference), countRoutes(app),
+			"concurrent Mounts of the same app must register exactly one route set")
+	})
 }
 
 // TestExportParity asserts the facade Export returns byte-identical payloads
