@@ -15,9 +15,10 @@ type Group struct {
 	UpdatedAt int64  `gorm:"autoUpdateTime" json:"-"`
 }
 
-// TableName specifies the table name for Group
+// TableName specifies the table name for Group: TablePrefix + "groups".
+// The default empty prefix keeps the v1.0 table name "groups".
 func (Group) TableName() string {
-	return "groups"
+	return TablePrefix + "groups"
 }
 
 // MarshalJSON customizes JSON serialization to convert timestamps to ISO 8601 strings

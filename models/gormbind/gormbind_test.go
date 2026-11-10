@@ -91,6 +91,107 @@ func TestAutoMigrate(t *testing.T) {
 	}
 }
 
+// TestAutoMigrateWithTablePrefix verifies the prefix round trip: with
+// SetTablePrefix("knot_") in effect, AutoMigrate on a freshly opened
+// database physically creates knot_groups/knot_apis/knot_parameters, no bare
+// groups/apis/parameters tables exist, and full CRUD through the models hits
+// the prefixed tables.
+func TestAutoMigrateWithTablePrefix(t *testing.T) {
+	// The prefix is process-global; always restore the v1.0 default so the
+	// other tests (which open their own databases) see bare table names.
+	models.SetTablePrefix("knot_")
+	defer models.SetTablePrefix("")
+
+	// Open the database AFTER the prefix is set: GORM resolves table names
+	// when a schema is parsed, and each *gorm.DB caches parsed schemas per
+	// instance, so a fresh database picks up the prefixed TableName()s.
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("Failed to connect to test database: %v", err)
+	}
+	db.Exec("PRAGMA foreign_keys = ON")
+
+	if err := AutoMigrate(db); err != nil {
+		t.Fatalf("AutoMigrate with table prefix failed: %v", err)
+	}
+
+	// The prefixed tables must physically exist, checked by literal table
+	// name (not through the model) so the assertion cannot pass via
+	// TableName() alone.
+	for _, table := range []string{"knot_groups", "knot_apis", "knot_parameters"} {
+		if !db.Migrator().HasTable(table) {
+			t.Errorf("Expected prefixed table %q to exist after AutoMigrate", table)
+		}
+	}
+
+	// The bare v1.0 tables must be absent: nothing may silently fall back
+	// to the unprefixed names.
+	for _, table := range []string{"groups", "apis", "parameters"} {
+		if db.Migrator().HasTable(table) {
+			t.Errorf("Expected bare table %q to be absent when a prefix is set", table)
+		}
+	}
+
+	// Full CRUD round trip against the prefixed tables.
+
+	// Create: group -> API -> parameter.
+	group := models.Group{Name: "Prefix Group", Order: 1}
+	if err := db.Create(&group).Error; err != nil {
+		t.Fatalf("Failed to create group in knot_groups: %v", err)
+	}
+	api := models.API{GroupID: group.ID, Name: "Prefixed API", Endpoint: "/prefixed", Method: "GET", Type: "HTTP", Order: 0}
+	if err := db.Create(&api).Error; err != nil {
+		t.Fatalf("Failed to create API in knot_apis: %v", err)
+	}
+	param := models.Parameter{APIID: api.ID, Name: "prefixedParam", Type: "string", ParamType: "request", Order: 0}
+	if err := db.Create(&param).Error; err != nil {
+		t.Fatalf("Failed to create parameter in knot_parameters: %v", err)
+	}
+
+	// The rows must physically live in the prefixed tables.
+	var apiCount int64
+	if err := db.Table("knot_apis").Count(&apiCount).Error; err != nil {
+		t.Fatalf("Failed to count rows in knot_apis: %v", err)
+	}
+	if apiCount != 1 {
+		t.Errorf("Expected 1 row in knot_apis, got %d", apiCount)
+	}
+
+	// Read: preload the whole hierarchy through the models.
+	var gotGroup models.Group
+	if err := db.Preload("APIs").Preload("APIs.Parameters").First(&gotGroup, group.ID).Error; err != nil {
+		t.Fatalf("Failed to read prefixed group: %v", err)
+	}
+	if gotGroup.Name != "Prefix Group" || len(gotGroup.APIs) != 1 || len(gotGroup.APIs[0].Parameters) != 1 {
+		t.Errorf("Unexpected prefixed hierarchy read: name=%q apis=%d params=%d",
+			gotGroup.Name, len(gotGroup.APIs), len(gotGroup.APIs[0].Parameters))
+	}
+
+	// Update.
+	if err := db.Model(&api).Update("Name", "Updated API").Error; err != nil {
+		t.Fatalf("Failed to update prefixed API: %v", err)
+	}
+	var gotAPI models.API
+	if err := db.First(&gotAPI, api.ID).Error; err != nil {
+		t.Fatalf("Failed to re-read prefixed API: %v", err)
+	}
+	if gotAPI.Name != "Updated API" {
+		t.Errorf("Expected updated name %q, got %q", "Updated API", gotAPI.Name)
+	}
+
+	// Delete: removing the group cascades to its prefixed API rows.
+	if err := db.Delete(&group).Error; err != nil {
+		t.Fatalf("Failed to delete prefixed group: %v", err)
+	}
+	var remainingAPIs, remainingParams int64
+	db.Model(&models.API{}).Count(&remainingAPIs)
+	db.Model(&models.Parameter{}).Count(&remainingParams)
+	if remainingAPIs != 0 || remainingParams != 0 {
+		t.Errorf("Expected cascade to leave 0 APIs and 0 parameters, got %d and %d",
+			remainingAPIs, remainingParams)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Behavioral tests re-homed from the former backend-internal model tests
 // (rescued in the models-library Task 1 extraction). They exercise GORM

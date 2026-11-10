@@ -21,9 +21,10 @@ type API struct {
 	UpdatedAt  int64       `gorm:"autoUpdateTime" json:"-"`
 }
 
-// TableName specifies the table name for API
+// TableName specifies the table name for API: TablePrefix + "apis".
+// The default empty prefix keeps the v1.0 table name "apis".
 func (API) TableName() string {
-	return "apis"
+	return TablePrefix + "apis"
 }
 
 // MarshalJSON customizes JSON serialization to convert timestamps to ISO 8601 strings

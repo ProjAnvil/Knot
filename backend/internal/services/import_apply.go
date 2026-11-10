@@ -9,16 +9,10 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-// ImportResult reports what an applied import plan did (or, for a dry run,
-// what it would do). It is the payload of the import preview/confirm flow.
-type ImportResult struct {
-	Format             string   `json:"format"`
-	GroupsCreated      int      `json:"groupsCreated"`
-	GroupsMerged       int      `json:"groupsMerged"`
-	APIsImported       int      `json:"apisImported"`
-	ParametersImported int      `json:"parametersImported"`
-	Warnings           []string `json:"warnings"`
-}
+// ImportResult is relocated to the models module (models v1.1); this alias
+// keeps every services/handler reference and test compiling unchanged while
+// the canonical definition ships with the shared data model.
+type ImportResult = models.ImportResult
 
 // importGroupState tracks the running resolution of one group name within a
 // single ApplyImport run. Keeping the state in memory (instead of re-querying
