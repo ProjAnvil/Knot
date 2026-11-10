@@ -73,7 +73,6 @@ func runServer() {
 	// deferred here.
 	k, err := knot.New(knot.Config{DB: db, APIPrefix: "/api"})
 	if err != nil {
-		logger.Log.Fatal(fmt.Sprintf("Failed to initialize engine: %v", err))
 		log.Fatalf("Failed to initialize engine: %v", err)
 	}
 	k.Mount(app)
