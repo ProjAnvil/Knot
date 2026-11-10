@@ -66,6 +66,18 @@ export interface ImportAPI {
   Response: ParamNode[];
 }
 /**
+ * ImportResult reports what an applied import plan did (or, for a dry run,
+ * what it would do). It is the payload of the import preview/confirm flow.
+ */
+export interface ImportResult {
+  format: string;
+  groupsCreated: number /* int */;
+  groupsMerged: number /* int */;
+  apisImported: number /* int */;
+  parametersImported: number /* int */;
+  warnings: string[];
+}
+/**
  * ImportFormat identifies the exchange format of an uploaded import file.
  * The string values are stable identifiers used by the import handler.
  */
