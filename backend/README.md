@@ -28,7 +28,7 @@ the process, an embedding application can do too.
 ## Installation
 
 ```sh
-go get github.com/ProjAnvil/knot/backend@v0.1.0
+go get github.com/ProjAnvil/knot/backend@v0.1.1
 ```
 
 ```go

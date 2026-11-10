@@ -3,7 +3,7 @@ module github.com/ProjAnvil/knot/backend
 go 1.25.5
 
 require (
-	github.com/ProjAnvil/knot/models v1.2.0
+	github.com/ProjAnvil/knot/models v1.1.1
 	github.com/glebarez/sqlite v1.11.0
 	github.com/gofiber/fiber/v2 v2.52.10
 	github.com/spf13/cobra v1.10.1

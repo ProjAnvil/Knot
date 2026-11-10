@@ -21,13 +21,13 @@ It is versioned with `models/vX.Y.Z` git tags (e.g. `models/v1.0.0`), and
 ## Versioning
 
 The module follows [semantic versioning](https://semver.org/) via the
-repository's `models/v*` tags — the current release is **v1.2.0**. Breaking
+repository's `models/v*` tags — the current release is **v1.1.1**. Breaking
 changes to any exported type or to the wire format bump the major version
 (per Go module conventions, a v2 would move the import path to
 `github.com/ProjAnvil/knot/models/v2`); backwards-compatible additions are
 minor releases; fixes are patches.
 
-v1.2.0 is an additive wire change: the `Group` domain type's JSON now emits
+v1.1.1 is an additive wire change: the `Group` domain type's JSON now emits
 `order` (its `MarshalJSON` previously omitted the field). Consumers see one
 new field wherever a `Group` is marshaled; nothing is renamed or removed.
 
