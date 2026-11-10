@@ -105,12 +105,13 @@ func (k *Knot) Mount(app *fiber.App) {
 }
 
 // Export renders the selected APIs in the given format and returns the
-// payload, the download filename and the Content-Type, byte-identical to the
-// HTTP export handler: format "" and "html" produce the HTML document,
-// "json", "openapi" and "postman" the respective JSON documents. locale
-// selects the HTML language and defaults to "zh" when empty. The payload and
-// filename are stamped with the current time at second granularity, exactly
-// like the handler.
+// payload and the download filename, byte-identical to the HTTP export
+// handler: format "" and "html" produce the HTML document, "json",
+// "openapi" and "postman" the respective JSON documents. locale selects the
+// HTML language and defaults to "zh" when empty. The payload and filename
+// are stamped with the current time at second granularity, exactly like the
+// handler; hosts pick the Content-Type from the format the same way the
+// export handler does.
 func (k *Knot) Export(apiIDs []uint, format string, locale string) ([]byte, string, error) {
 	payload, filename, _, err := services.BuildExportDocument(k.db, apiIDs, format, locale, time.Now())
 	if err != nil {

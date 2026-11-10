@@ -142,6 +142,10 @@ from the compose file; data persists in the `knot-data` volume.
 
 Knot's data model is published as an importable Go module in [`models/`](./models/): the domain types (`Group`, `API`, `Parameter`), the Knot JSON v1 wire-format types, and validation constants, plus a JSON Schema and TypeScript declarations for non-Go consumers. The module is versioned independently via `models/v*` tags — see the [models README](./models/README.md) for install, semver, and artifact details.
 
+### Embeddable engine
+
+The backend itself is published as an embeddable Go module: `go get github.com/ProjAnvil/knot/backend`, then `knot.New` + `Mount` serve the engine's full `/api` surface (groups, APIs, parameters, export, import) inside any Fiber + GORM host application, next to the host's own routes and tables — with an optional table prefix for shared databases. The standalone server and CLI are themselves just hosts of this engine; see the [backend README](./backend/README.md) for the host contract and examples.
+
 ## Configuration
 
 Knot stores its configuration at:

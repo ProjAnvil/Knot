@@ -21,7 +21,7 @@ It is versioned with `models/vX.Y.Z` git tags (e.g. `models/v1.0.0`), and
 ## Versioning
 
 The module follows [semantic versioning](https://semver.org/) via the
-repository's `models/v*` tags — the current release is **v1.0.0**. Breaking
+repository's `models/v*` tags — the current release is **v1.1.0**. Breaking
 changes to any exported type or to the wire format bump the major version
 (per Go module conventions, a v2 would move the import path to
 `github.com/ProjAnvil/knot/models/v2`); backwards-compatible additions are
@@ -96,6 +96,13 @@ Backwards-compatible additions over v1.0 (see [Versioning](#versioning)):
   (same fields, same JSON tags: `format`/`groupsCreated`/`groupsMerged`/
   `apisImported`/`parametersImported`/`warnings`) so import tooling can
   consume the preview/confirm payload without importing the backend.
+- The embeddable engine module
+  ([`backend`](https://github.com/ProjAnvil/knot/blob/main/backend/README.md))
+  consumes both additions through this module: `knot.Config.TablePrefix`
+  installs the prefix via `SetTablePrefix`, and `knot.Knot.Import` returns
+  `*models.ImportResult` (the backend's internal services package aliases it
+  as `type ImportResult = models.ImportResult`) — so engine hosts get these
+  types through the backend import alone.
 
 ## Wire-format artifacts
 Two generated artifacts ship in the module so non-Go consumers can speak the
