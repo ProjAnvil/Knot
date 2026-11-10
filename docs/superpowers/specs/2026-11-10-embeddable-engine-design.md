@@ -1,7 +1,7 @@
 # Embeddable Knot Engine — Design
 
 - Date: 2026-11-10
-- Status: Draft (pending builder check)
+- Status: Final (builder check applied — 4 corrections folded in; see §7.5)
 - Target releases: `models/v1.1.0` (library minor) and `v0.7.1` (product patch)
 
 ## 1. Intent
@@ -23,10 +23,14 @@ Product-owner decisions already made:
 - **Same database, table prefix:** Knot's tables (`groups`, `apis`,
   `parameters`) are too generic to drop into a host DB unprotected — a
   configurable `TablePrefix` (e.g. `knot_`) is part of the contract.
-- **Versioning: the product ships this as a PATCH (`v0.7.1`)** — no product
-  behavior change; the binary is the same engine plus host wiring. The models
-  library takes its own MINOR (`models/v1.1.0`) for the new prefix capability.
-  The two version streams are independent by design.
+- **Versioning: three independent streams.** Product PATCH (`v0.7.1`, no
+  behavior change); models MINOR (`models/v1.1.0`: `SetTablePrefix` +
+  `ImportResult` relocation); engine library FIRST release (`backend/v0.1.0`)
+  — required because backend's `replace ../models` is inert downstream, so a
+  consumable engine needs its own subdirectory-module tag exactly like
+  `models/`. `backend/v0.1.0` is v0 (unstable allowance) until real hosts
+  stabilize it. Tag order: `models/v1.1.0` → `backend/v0.1.0` (backend's
+  `require models v1.1.0` must resolve) → `v0.7.1`.
 
 ## 2. Goals
 
@@ -137,8 +141,10 @@ func (k *Knot) Export(apiIDs []uint, format string, locale string) ([]byte, stri
 // mirrors POST /api/export semantics incl. filename; format validated by the
 // same code path as the handler.
 
-func (k *Knot) Import(data []byte, format ImportFormat, dryRun bool) (*models.ImportResult, error)
-// detect + parse + ApplyImport — mirrors POST /api/import minus multipart.
+func (k *Knot) Import(data []byte, dryRun bool) (*models.ImportResult, error)
+// auto-detects format (DetectImportFormat) + parse + ApplyImport — mirrors
+// POST /api/import minus multipart. Returns models.ImportResult (relocated
+// from internal services in models v1.1 so hosts can name the type).
 
 func (k *Knot) Close() error
 // no-op today (engine owns nothing); exists for host lifecycle symmetry and
@@ -169,7 +175,34 @@ func (k *Knot) Close() error
 - Tests: prefix round-trip (migrate with `knot_` prefix on in-memory sqlite,
   CRUD, verify physical table names), default-empty regression.
 
-### 7.4 Versioning
+### 7.4 Versioning and consumption mechanics
+
+- `backend/go.mod` requires `models v1.1.0` (bumped in this branch; the
+  in-repo `replace` keeps development/CI working, downstream resolution uses
+  the published tag).
+- Sentia consumes: `go get github.com/ProjAnvil/knot/backend@v0.1.0` (public
+  repo; alias `import knot "github.com/ProjAnvil/knot/backend"`).
+- CI host-B smoke uses TWO replaces (backend AND models) because backend's
+  own replace is inert inside the scratch main module.
+- The 85% per-function backend gate applies to the new facade file — it ships
+  with real unit tests, not just the smoke.
+
+### 7.5 Builder-check corrections folded in
+
+- `ImportResult` moves to models v1.1 (`models/import_plan.go` family;
+  services keeps an alias for internal callers). Facade returns the models
+  type.
+- Facade `Import` auto-detects the format (no format parameter).
+- `/api/health` registration and the embedded frontend stay HOST-side
+  (verified: already host-side today); `registerRoutes` covers only the
+  `/api` group routes.
+- mcp-tools handler verified stateless (closures over db only) — mounting it
+  everywhere is safe.
+- Table-prefix stress test passed: no table-name literals in production SQL
+  (only `order` column references); frontend hardcodes `API_BASE='/api'` and
+  is unaffected because host A keeps the default prefix.
+
+### 7.6 Versioning (original)
 
 - Product `v0.7.1` (patch): binary behavior identical; release notes state
   the engine library capability.
