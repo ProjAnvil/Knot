@@ -28,6 +28,128 @@ jobs:
         working-directory: backend
         run: make test-coverage
 
+      # Host-B consumption smoke (Sentia scenario): build a throwaway host
+      # module outside the workspace and embed the engine the way an external
+      # consumer would: own sqlite database with a host table, own Fiber app,
+      # knot.New/Mount/Import. TWO replaces are required because
+      # backend/go.mod's own `replace .../models => ../models` only applies
+      # when backend is the main module; downstream it is inert, so the smoke
+      # module must redirect BOTH backend and models to the checkout.
+      - name: Embedded-host smoke test (engine)
+        run: |
+          SMOKE=$(mktemp -d)
+          cd "$SMOKE"
+          go mod init sentia-smoke
+          go mod edit -replace github.com/ProjAnvil/knot/backend=${{ github.workspace }}/backend
+          go mod edit -replace github.com/ProjAnvil/knot/models=${{ github.workspace }}/models
+          cat > main.go <<'EOF'
+          package main
+
+          import (
+            "encoding/json"
+            "fmt"
+            "net/http"
+            "os"
+
+            knot "github.com/ProjAnvil/knot/backend"
+            "github.com/glebarez/sqlite"
+            "github.com/gofiber/fiber/v2"
+            "gorm.io/gorm"
+          )
+
+          // fixture is a minimal knot-json v1 export: one group holding one HTTP API.
+          const fixture = `{"format":"knot","version":1,"exportedAt":"2026-11-10T00:00:00Z","groups":[{"name":"SmokeGroup","apis":[{"name":"A","endpoint":"/a","method":"GET","type":"HTTP","parameters":{"request":[],"response":[]}}]}]}`
+
+          // fail prints the failed assertion and exits non-zero so the CI step fails.
+          func fail(format string, args ...interface{}) {
+            fmt.Printf("smoke FAIL: "+format+"\n", args...)
+            os.Exit(1)
+          }
+
+          func main() {
+            // The host owns the database: open sqlite in memory and install a
+            // host table with one row. The engine must coexist with this
+            // schema, not replace it.
+            db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+            if err != nil {
+              fail("open sqlite: %v", err)
+            }
+            if err := db.Exec("CREATE TABLE sentia_users (id INTEGER PRIMARY KEY, name TEXT)").Error; err != nil {
+              fail("create sentia_users: %v", err)
+            }
+            if err := db.Exec("INSERT INTO sentia_users (name) VALUES ('sentia-owner')").Error; err != nil {
+              fail("seed sentia_users: %v", err)
+            }
+
+            // Embed the engine: New installs the knot_ table prefix and
+            // migrates the engine tables into the host database.
+            k, err := knot.New(knot.Config{DB: db, APIPrefix: "/knot/api", TablePrefix: "knot_"})
+            if err != nil {
+              fail("knot.New: %v", err)
+            }
+
+            // Mount the engine into the host's own Fiber app; a mounted route
+            // must answer 200 with a parseable success envelope.
+            app := fiber.New(fiber.Config{DisableStartupMessage: true})
+            k.Mount(app)
+            req, err := http.NewRequest(http.MethodGet, "/knot/api/groups", nil)
+            if err != nil {
+              fail("build groups request: %v", err)
+            }
+            resp, err := app.Test(req)
+            if err != nil {
+              fail("app.Test GET /knot/api/groups: %v", err)
+            }
+            if resp.StatusCode != http.StatusOK {
+              fail("GET /knot/api/groups status = %d, want 200", resp.StatusCode)
+            }
+            var envelope struct {
+              Success bool             `json:"success"`
+              Data    []map[string]any `json:"data"`
+            }
+            if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
+              fail("decode groups envelope: %v", err)
+            }
+            if !envelope.Success {
+              fail("groups envelope success = false, want true")
+            }
+
+            // Direct service call: dry-run import of the fixture on the fresh
+            // database. The counts are deterministic: one group, one API.
+            result, err := k.Import([]byte(fixture), true)
+            if err != nil {
+              fail("Import dry-run: %v", err)
+            }
+            if result.GroupsCreated != 1 || result.APIsImported != 1 {
+              fail("dry-run counts groupsCreated=%d apisImported=%d, want 1/1",
+                result.GroupsCreated, result.APIsImported)
+            }
+
+            // Physical schema checks: the engine tables live under the knot_
+            // prefix and bare names must not leak into the host schema.
+            if !db.Migrator().HasTable("knot_groups") {
+              fail("table knot_groups should exist after New")
+            }
+            if db.Migrator().HasTable("groups") {
+              fail("bare table groups must not exist with TablePrefix knot_")
+            }
+
+            // Host data untouched: the seeded row is still exactly one.
+            var hostRows int64
+            if err := db.Raw("SELECT COUNT(*) FROM sentia_users").Scan(&hostRows).Error; err != nil {
+              fail("count sentia_users: %v", err)
+            }
+            if hostRows != 1 {
+              fail("sentia_users rows = %d, want 1 (host data must be untouched)", hostRows)
+            }
+
+            fmt.Printf("sentia smoke ok: status=200 envelope=true groupsCreated=1 apisImported=1 knot_groups=present bare_groups=absent host_rows=%d\n", hostRows)
+          }
+          EOF
+          # tidy is REQUIRED: a replace without a require cannot build.
+          GOWORK=off go mod tidy
+          GOWORK=off go build ./... && GOWORK=off ./sentia-smoke
+
       # Upload even when the coverage gate fails so the profile is
       # available for debugging the failure.
       - name: Upload coverage profile

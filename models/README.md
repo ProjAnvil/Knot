@@ -21,7 +21,7 @@ It is versioned with `models/vX.Y.Z` git tags (e.g. `models/v1.0.0`), and
 ## Versioning
 
 The module follows [semantic versioning](https://semver.org/) via the
-repository's `models/v*` tags — the current release is **v1.0.0**. Breaking
+repository's `models/v*` tags — the current release is **v1.1.0**. Breaking
 changes to any exported type or to the wire format bump the major version
 (per Go module conventions, a v2 would move the import path to
 `github.com/ProjAnvil/knot/models/v2`); backwards-compatible additions are
@@ -38,7 +38,8 @@ The **root package** defines:
 
 - the domain types `Group`, `API`, and `Parameter`, plus `ParamNode` (the
   nested parameter tree projected from flat `Parameter` rows) and the
-  import-preview types (`ImportPlan`, `ImportGroup`, `ImportAPI`);
+  import-preview types (`ImportPlan`, `ImportGroup`, `ImportAPI`,
+  `ImportResult`);
 - the Knot JSON v1 wire-format types — `KnotExportDocument` with its
   `KnotExportGroup` / `KnotExportAPI` / `KnotExportParams` children, and the
   envelope constants `WireFormat` (`"knot"`) and `WireVersion` (`1`);
@@ -52,6 +53,22 @@ The root package imports only the Go standard library.
 `gormbind.AutoMigrate(db)`, or use `gormbind.MigrateModels()` with your own
 migration flow, to create/migrate the `groups`, `apis`, and `parameters`
 tables. Importing this subpackage pulls in GORM.
+
+### Table name prefix (v1.1)
+
+Embedders that share one database with other software can namespace Knot's
+tables with `models.SetTablePrefix` (default `""`, i.e. the v1.0 bare names):
+
+```go
+models.SetTablePrefix("knot_")   // before the first DB use: knot_groups, knot_apis, knot_parameters
+err := gormbind.AutoMigrate(db)
+```
+
+The prefix is process-global: set it once before the first database use and
+run a single engine instance per process. GORM resolves table names when a
+model schema is first parsed and caches them per `*gorm.DB`, so changing the
+prefix afterwards has no effect on an open database, and existing tables are
+never renamed.
 
 ### Example
 
@@ -67,8 +84,27 @@ ok := models.IsValidMethod("GET")       // validation predicate
 err := gormbind.AutoMigrate(db) // db *gorm.DB; migrates groups/apis/parameters
 ```
 
-## Wire-format artifacts
+## Changes in v1.1
 
+Backwards-compatible additions over v1.0 (see [Versioning](#versioning)):
+
+- `SetTablePrefix` / `TablePrefix`: prefix all model tables
+  (`knot_groups`/`knot_apis`/`knot_parameters` style) so the models can be
+  embedded in a shared database. The default empty prefix preserves the v1.0
+  physical schema.
+- `ImportResult` relocated verbatim from the Knot backend's services package
+  (same fields, same JSON tags: `format`/`groupsCreated`/`groupsMerged`/
+  `apisImported`/`parametersImported`/`warnings`) so import tooling can
+  consume the preview/confirm payload without importing the backend.
+- The embeddable engine module
+  ([`backend`](https://github.com/ProjAnvil/knot/blob/main/backend/README.md))
+  consumes both additions through this module: `knot.Config.TablePrefix`
+  installs the prefix via `SetTablePrefix`, and `knot.Knot.Import` returns
+  `*models.ImportResult` (the backend's internal services package aliases it
+  as `type ImportResult = models.ImportResult`) — so engine hosts get these
+  types through the backend import alone.
+
+## Wire-format artifacts
 Two generated artifacts ship in the module so non-Go consumers can speak the
 same Knot JSON v1 interchange format:
 

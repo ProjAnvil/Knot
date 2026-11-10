@@ -628,4 +628,38 @@ func TestExportAPIs(t *testing.T) {
 		assert.False(t, respBody.Success)
 		assert.Contains(t, respBody.Error, "Unsupported export format")
 	})
+
+	t.Run("givenDatabaseFailure_whenExport_then500", func(t *testing.T) {
+		// Arrange: seed while the database works, then close the connection
+		// pool so the export fetch fails and the handler reports 500.
+		db := setupTestDB(t)
+		api := createExportAPIWithGroup(t, db)
+		sqlDB, err := db.DB()
+		require.NoError(t, err)
+		require.NoError(t, sqlDB.Close())
+
+		app := setupExportTestApp(db)
+
+		body := map[string]interface{}{
+			"apiIds": []uint{api.ID},
+			"format": "json",
+		}
+		jsonBody, _ := json.Marshal(body)
+
+		// Act
+		req := httptest.NewRequest("POST", "/api/export", bytes.NewReader(jsonBody))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+
+		// Assert
+		assert.Equal(t, fiber.StatusInternalServerError, resp.StatusCode)
+
+		var respBody response.Response
+		err = json.NewDecoder(resp.Body).Decode(&respBody)
+		require.NoError(t, err)
+
+		assert.False(t, respBody.Success)
+		assert.Contains(t, respBody.Error, "Failed to export APIs")
+	})
 }

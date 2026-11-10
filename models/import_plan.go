@@ -27,6 +27,17 @@ type ImportAPI struct {
 	Response []ParamNode
 }
 
+// ImportResult reports what an applied import plan did (or, for a dry run,
+// what it would do). It is the payload of the import preview/confirm flow.
+type ImportResult struct {
+	Format             string   `json:"format"`
+	GroupsCreated      int      `json:"groupsCreated"`
+	GroupsMerged       int      `json:"groupsMerged"`
+	APIsImported       int      `json:"apisImported"`
+	ParametersImported int      `json:"parametersImported"`
+	Warnings           []string `json:"warnings"`
+}
+
 // ImportFormat identifies the exchange format of an uploaded import file.
 // The string values are stable identifiers used by the import handler.
 type ImportFormat string

@@ -296,18 +296,33 @@ func TestBuildPostmanCollection(t *testing.T) {
 	})
 }
 
-// TestNewUUIDv4 covers the crypto/rand UUID generator used for
-// info._postman_id.
-func TestNewUUIDv4(t *testing.T) {
-	t.Run("Given100Calls_whenCollect_thenAllValidV4AndUnique", func(t *testing.T) {
+// TestNewPostmanID covers the deterministic instant-derived generator used
+// for info._postman_id: same instant → same well-formed UUID, different
+// instants → different UUIDs.
+func TestNewPostmanID(t *testing.T) {
+	t.Run("GivenSameInstant_whenGenerateTwice_thenIdenticalValidV4", func(t *testing.T) {
+		now := time.Date(2026, 11, 10, 0, 0, 0, 0, time.UTC)
+		first := newPostmanID(now)
+		second := newPostmanID(now)
+
+		if first != second {
+			t.Fatalf("Expected a deterministic ID for the same instant, got %q and %q", first, second)
+		}
+		if !uuidV4Pattern.MatchString(first) {
+			t.Fatalf("UUID %q does not match the v4 pattern (version/variant bits wrong?)", first)
+		}
+	})
+
+	t.Run("GivenDifferentSeconds_whenGenerate_thenAllValidV4AndUnique", func(t *testing.T) {
+		base := time.Date(2026, 11, 10, 0, 0, 0, 0, time.UTC)
 		seen := make(map[string]bool, 100)
 		for i := 0; i < 100; i++ {
-			id := NewUUIDv4()
+			id := newPostmanID(base.Add(time.Duration(i) * time.Second))
 			if !uuidV4Pattern.MatchString(id) {
 				t.Fatalf("UUID %q does not match the v4 pattern (version/variant bits wrong?)", id)
 			}
 			if seen[id] {
-				t.Fatalf("UUID %q generated twice at call %d", id, i)
+				t.Fatalf("UUID %q generated twice at second %d", id, i)
 			}
 			seen[id] = true
 		}

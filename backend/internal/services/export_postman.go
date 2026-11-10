@@ -1,9 +1,10 @@
 package services
 
 import (
-	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -116,7 +117,7 @@ func BuildPostmanCollection(apis []APIWithParams, now time.Time) *PostmanCollect
 	return &PostmanCollection{
 		Info: PostmanInfo{
 			Name:        "Knot Export",
-			PostmanID:   NewUUIDv4(),
+			PostmanID:   newPostmanID(now),
 			Description: "Exported from Knot at " + now.UTC().Format(time.RFC3339),
 			Schema:      postmanSchemaURL,
 		},
@@ -174,15 +175,16 @@ func exampleBody(params []models.Parameter) string {
 	return string(raw)
 }
 
-// NewUUIDv4 generates a random RFC 4122 version 4 UUID in the canonical
-// 8-4-4-4-12 hex format using crypto/rand.
-func NewUUIDv4() string {
-	var b [16]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		// crypto/rand only fails when the system entropy source is
-		// unavailable; fabricating a UUID then would be wrong, so fail loudly.
-		panic("services: NewUUIDv4: reading crypto/rand: " + err.Error())
-	}
+// newPostmanID derives info._postman_id deterministically from the export
+// instant (unix seconds). A stable ID per instant makes two exports of the
+// same data in the same second byte-identical — required by the facade and
+// HTTP handler parity contract, which share BuildExportDocument — while
+// different seconds still yield different IDs. The value keeps the RFC 4122
+// version-4 and variant bits and the canonical 8-4-4-4-12 hex shape, so it
+// remains a well-formed UUID for Postman.
+func newPostmanID(now time.Time) string {
+	sum := sha256.Sum256([]byte(fmt.Sprintf("knot-postman-%d", now.Unix())))
+	b := sum[:16]
 	b[6] = (b[6] & 0x0f) | 0x40 // version 4
 	b[8] = (b[8] & 0x3f) | 0x80 // RFC 4122 variant
 

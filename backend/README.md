@@ -1,400 +1,314 @@
-# Knot - Backend (Go)
+# Knot backend — the embeddable engine
 
-This is the Go rewrite of the Knot backend using **Fiber + GORM + Cobra**.
+[![Go Reference](https://pkg.go.dev/badge/github.com/ProjAnvil/knot/backend.svg)](https://pkg.go.dev/github.com/ProjAnvil/knot/backend)
 
-## Features
+Knot's backend as an embeddable Go component. A host application brings its
+own [Fiber](https://gofiber.io) app and its own [GORM](https://gorm.io)
+database connection, and delegates one concern to the engine: API-documentation
+management — groups, APIs and parameter trees over REST, plus multi-format
+export (HTML, Knot JSON, OpenAPI, Postman) and import (Knot JSON, Postman
+Collection v2.x, OpenAPI 3.x).
 
-- **High Performance**: Built with Go for superior performance and low resource usage
-- **Type Safe**: Compile-time type checking ensures robustness
-- **Multi-Database**: Supports SQLite, PostgreSQL, and MySQL
-- **REST API**: Full-featured REST API using Fiber framework
-- **ORM**: GORM for database operations with migrations
-- **Configuration**: Viper for flexible configuration management
-- **Logging**: Zap for high-performance structured logging
-- **Single Binary**: Compiles to a single executable with no runtime dependencies
+The whole integration is three calls:
 
-## Tech Stack
-
-| Component | Library | Purpose |
-|-----------|---------|---------|
-| Web Framework | [Fiber v2](https://github.com/gofiber/fiber) | HTTP server and routing |
-| ORM | [GORM](https://gorm.io/) | Database abstraction |
-| CLI Framework | [Cobra](https://github.com/spf13/cobra) | Command-line interface |
-| Config | [Viper](https://github.com/spf13/viper) | Configuration management |
-| Logger | [Zap](https://github.com/uber-go/zap) | Structured logging |
-
-## Project Structure
-
+```go
+engine, err := knot.New(knot.Config{DB: db}) // validates + migrates
+engine.Mount(app)                            // routes under /api
+payload, filename, err := engine.Export(ids, "html", "en")
 ```
-backend/
-├── cmd/
-│   ├── server/          # Server binary entry point
-│   │   └── main.go
-│   └── cli/             # CLI binary entry point (future)
-│       └── main.go
-├── internal/
-│   ├── models/          # GORM models
-│   ├── handlers/        # Fiber HTTP handlers
-│   ├── services/        # Business logic
-│   ├── config/          # Configuration management
-│   ├── database/        # Database initialization
-│   └── cli/             # CLI commands
-├── pkg/
-│   ├── logger/          # Logger wrapper
-│   └── response/        # HTTP response helpers
-├── web/                 # Static files (embedded)
-├── go.mod
-├── go.sum
-├── Makefile
-├── DESIGN.md            # Technical design document
-└── README.md
-```
+
+Knot's own `knot-server` and `knot` CLI are thin hosts over this engine
+(`cmd/server` and `cmd/cli` in this module): what they do with Fiber, GORM and
+the process, an embedding application can do too.
+
+> **Version status:** the module is **v0** — the engine API is allowed to
+> change between releases until the first hosts have stabilized it. Pin the
+> version in your `go.mod` and expect possible breakage until v1.
 
 ## Installation
 
-### Prerequisites
-
-- Go 1.25.4 or higher
-- Make (optional, for using Makefile)
-
-### Clone and Build
-
-```bash
-# Clone the repository
-cd /path/to/knot
-
-# Navigate to backend
-cd backend
-
-# Download dependencies
-go mod download
-
-# Build the server
-make build
-
-# Or build manually
-go build -o bin/knot-server ./cmd/server
-go build -o bin/knot ./cmd/cli
+```sh
+go get github.com/ProjAnvil/knot/backend@v0.1.0
 ```
 
-### Build Frontend (Required for Web UI)
-
-To serve the web interface, you need to build the frontend first:
-
-```bash
-# Build frontend
-cd ../frontend
-bun run build
-
-# The server will automatically find and serve frontend/dist
+```go
+import knot "github.com/ProjAnvil/knot/backend"
 ```
 
-The server automatically detects the frontend in these locations (in order):
-1. `./web/dist` (embedded/production)
-2. `./frontend/dist` (development - same directory)
-3. `../frontend/dist` (development - from backend)
+The package is named `knot` but lives at the module root (the import path
+ends in `backend`), so the explicit alias keeps references reading
+`knot.New` / `knot.Config`. Requires Go 1.25.5+ and any GORM driver you
+choose (SQLite, PostgreSQL, MySQL — the host opens the connection, not the
+engine).
 
-If frontend is not found, the server will still run but only API endpoints will work.
+The engine depends on the
+[`models`](https://github.com/ProjAnvil/knot/blob/main/models/README.md)
+module (v1.1+) for its data types; for example `Knot.Import` returns
+`*models.ImportResult` from there.
 
-## Configuration
+## Example: Knot inside a host application
 
-Configuration is stored in:
-- **Linux/macOS**: `~/.knot/config.json`
-- **Windows**: `%LOCALAPPDATA%/knot/config.json`
+A complete host ("Sentia") that owns its database, mounts the engine's routes
+at `/knot/api`, imports a Knot JSON backup directly, and exports HTML:
 
-### Default Configuration
+```go
+package main
 
-```json
-{
-  "databaseType": "sqlite",
-  "sqlitePath": "~/.knot/knot.db",
-  "port": 3000,
-  "host": "localhost",
-  "enableLogging": false
+import (
+	"errors"
+	"fmt"
+	"log"
+	"os"
+
+	knot "github.com/ProjAnvil/knot/backend"
+	"github.com/glebarez/sqlite"
+	"github.com/gofiber/fiber/v2"
+	"gorm.io/gorm"
+)
+
+func main() {
+	// Sentia owns its database and its HTTP app; Knot is a guest in both.
+	db, err := gorm.Open(sqlite.Open("sentia.db"), &gorm.Config{})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// New validates the config, installs the table prefix and runs the
+	// engine's only DDL — AutoMigrate of knot_groups / knot_apis /
+	// knot_parameters — leaving Sentia's own tables alone.
+	engine, err := knot.New(knot.Config{
+		DB:          db,
+		APIPrefix:   "/knot/api", // "" means the default "/api"
+		TablePrefix: "knot_",     // "" keeps the bare table names
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer engine.Close() // no-op: the DB connection belongs to Sentia
+
+	// Mount registers every engine route under /knot/api on Sentia's own
+	// Fiber app. It is idempotent — mounting defensively is safe.
+	app := fiber.New()
+	engine.Mount(app)
+
+	// Service methods are direct calls; no HTTP round-trip needed.
+	data, err := os.ReadFile("backup.knot.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	preview, err := engine.Import(data, true) // dry run: resolve only
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("dry run: %d group(s) created, %d API(s) imported\n",
+		preview.GroupsCreated, preview.APIsImported)
+
+	if _, err := engine.Import(data, false); err != nil {
+		if errors.Is(err, knot.ErrImportParse) {
+			log.Fatal("backup.knot.json is not a parseable Knot document")
+		}
+		log.Fatal(err)
+	}
+
+	// The prefixed tables are ordinary tables in Sentia's database.
+	var ids []uint
+	db.Table("knot_apis").Pluck("id", &ids)
+
+	payload, filename, err := engine.Export(ids, "html", "en")
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("%s: %d bytes\n", filename, len(payload))
+
+	// Sentia serves the mounted routes next to its own.
+	log.Fatal(app.Listen(":3000"))
 }
 ```
 
-### Database Types
+After `New` + `Mount`: the three `knot_*` tables live in Sentia's database
+next to its own schema, the engine's routes answer under `/knot/api`, and
+Sentia's tables, routes and listener stay entirely under its control.
 
-#### SQLite (default)
-```json
-{
-  "databaseType": "sqlite",
-  "sqlitePath": "~/.knot/knot.db"
+## Host contract
+
+### Config
+
+```go
+type Config struct {
+	DB          *gorm.DB // required — the host's own connection
+	APIPrefix   string   // "" → "/api" (DefaultAPIPrefix)
+	TablePrefix string   // "" → bare table names (see Table prefix)
 }
 ```
 
-#### PostgreSQL
-```json
-{
-  "databaseType": "postgres",
-  "postgresUrl": "postgres://user:pass@localhost:5432/knot"
-}
+### New
+
+```go
+func New(cfg Config) (*Knot, error)
 ```
 
-#### MySQL
-```json
-{
-  "databaseType": "mysql",
-  "mysqlUrl": "user:pass@tcp(localhost:3306)/knot?charset=utf8mb4&parseTime=True"
-}
+- `DB` must be non-nil; anything else fails before touching the database.
+- A non-empty `TablePrefix` is installed via `models.SetTablePrefix`
+  **before** migration. An empty one leaves any prefix the host already set
+  untouched — `New` never clobbers it.
+- Runs the canonical `gormbind.AutoMigrate` — the only DDL the engine ever
+  executes (see [Ownership rules](#ownership-rules)).
+- Every failure is wrapped with the failing step
+  (e.g. `knot: auto-migrate failed: ...`).
+
+### Mount
+
+```go
+func (k *Knot) Mount(app *fiber.App)
 ```
 
-#### Environment variable overrides
+Registers all engine routes on the host's app under `Config.APIPrefix`
+(default `/api`). Mount is **idempotent**: a second call is a no-op, so hosts
+can mount defensively. It registers nothing else — static file serving,
+health checks and middleware stay with the host (the standalone server
+registers its own `/api/health` before mounting).
 
-All database settings can be overridden at runtime via environment variables
-(useful for containers). These take precedence over `config.json` and are not
-persisted:
+Mounted routes:
 
-| Variable | Config field |
-|---|---|
-| `KNOT_DATABASE_TYPE` | `databaseType` |
-| `KNOT_SQLITE_PATH` | `sqlitePath` |
-| `KNOT_POSTGRES_URL` | `postgresUrl` |
-| `KNOT_MYSQL_URL` | `mysqlUrl` |
-
-## Usage
-
-### Development Mode
-
-```bash
-# Run server directly
-make run
-
-# Or
-go run ./cmd/server/main.go
+```
+GET    {prefix}/groups                        list groups
+GET    {prefix}/groups/with-apis              groups incl. their APIs
+POST   {prefix}/groups                        create group
+POST   {prefix}/groups/orders                 reorder groups
+PATCH  {prefix}/groups/:id                    update group
+DELETE {prefix}/groups/:id                    delete group
+GET    {prefix}/apis/:id                      get one API
+GET    {prefix}/apis/group/:groupId           APIs of one group
+POST   {prefix}/apis                          create API
+PATCH  {prefix}/apis/:id                      update API
+PATCH  {prefix}/apis/:id/note                 update API note
+POST   {prefix}/apis/orders                   reorder APIs
+POST   {prefix}/apis/:id/duplicate            duplicate API
+DELETE {prefix}/apis/:id                      delete API
+PUT    {prefix}/apis/:id/parameters           replace parameter tree
+POST   {prefix}/apis/:id/parameters/from-json replace parameters from JSON
+POST   {prefix}/export                        export (HTML/JSON/OpenAPI/Postman)
+POST   {prefix}/import                        import (auto-detected format)
+POST   {prefix}/mcp-tools                     MCP tools endpoint
 ```
 
-### Production Mode
+Responses use the Knot envelope — `{"success":true,"data":...}` on success,
+`{"success":false,"error":"..."}` on failure.
 
-```bash
-# Build binary
-make build
+### Export
 
-# Run binary
-./bin/knot-server
+```go
+func (k *Knot) Export(apiIDs []uint, format string, locale string) ([]byte, string, error)
 ```
 
-### Environment Variables
+Renders the selected APIs and returns the payload bytes plus the download
+filename, byte-identical to the HTTP export handler (both are stamped with
+the current time at second granularity). `format` `""` and `"html"` produce
+the standalone HTML document; `"json"`, `"openapi"` and `"postman"` produce
+the respective JSON documents; anything else fails with
+`ErrUnsupportedFormat`. `locale` selects the HTML document language and
+defaults to `"zh"` when empty. An empty `apiIDs` fails with `ErrNoAPIIDs`.
 
-You can override configuration with environment variables:
+### Import
 
-```bash
-# Set custom port
-PORT=8080 ./bin/knot-server
-
-# Set custom host
-HOST=0.0.0.0 PORT=3000 ./bin/knot-server
+```go
+func (k *Knot) Import(data []byte, dryRun bool) (*models.ImportResult, error)
 ```
 
-## API Endpoints
+Detects the document's format (Knot JSON, Postman Collection v2.x,
+OpenAPI 3.x), parses it, and applies the whole plan in one transaction. With
+`dryRun=true` the identical resolution logic runs but nothing is written; the
+returned counts are what a real run would produce. Imported groups whose name
+matches an existing group merge into it, otherwise new groups are created.
+The result reports `format`, `groupsCreated`, `groupsMerged`, `apisImported`,
+`parametersImported` and `warnings` (field names as JSON-encoded by the
+import endpoint).
 
-### Health Check
-```
-GET /api/health
-```
+### Close
 
-### Groups
-```
-GET    /api/groups              # Get all groups
-GET    /api/groups/with-apis    # Get groups with APIs
-POST   /api/groups              # Create group
-PATCH  /api/groups/:id          # Update group
-DELETE /api/groups/:id          # Delete group
-```
-
-### APIs
-```
-GET    /api/apis/:id                      # Get single API
-GET    /api/apis/group/:groupId           # Get APIs by group
-POST   /api/apis                          # Create API
-PATCH  /api/apis/:id                      # Update API
-PATCH  /api/apis/:id/note                 # Update API note
-POST   /api/apis/orders                   # Update API orders
-DELETE /api/apis/:id                      # Delete API
-PUT    /api/apis/:id/parameters           # Update parameters
-POST   /api/apis/:id/parameters/from-json # Update from JSON
+```go
+func (k *Knot) Close() error
 ```
 
-### Response Format
+A documented no-op. The engine holds no resources of its own — the database
+connection belongs to the host — so `Close` exists only to be deferred
+symmetrically with `New`.
 
-All API responses follow this format:
+## Errors
 
-```json
-{
-  "success": true,
-  "data": { ... }
-}
-```
+The service methods report failures as sentinel errors, listed here exactly
+as defined. Match them with `errors.Is`; wrapped detail is preserved, so
+`err.Error()` stays log-worthy while the mapping stays stable. The suggested
+HTTP analog mirrors the standalone server's handlers:
 
-Error responses:
+| Sentinel | Meaning | HTTP analog |
+| --- | --- | --- |
+| `ErrUnsupportedFormat` | export format or import document not recognized | 415 |
+| `ErrNoAPIIDs` | `Export` called with an empty `apiIDs` | 400 |
+| `ErrExportFailed` | database or encoding failure during export | 500 |
+| `ErrImportParse` | a detected import document failed to parse | 400 |
+| `ErrImportApply` | failure while persisting an import plan | 500 |
 
-```json
-{
-  "success": false,
-  "error": "Error message"
-}
-```
+## Ownership rules
 
-## Building
+- **The database connection belongs to the host.** The engine never closes
+  it — `Close` is a no-op. Open, share and close the `*gorm.DB` like any
+  other part of the host.
+- **The engine's only DDL is the `AutoMigrate` inside `New`.** It creates or
+  extends the (optionally prefixed) `groups`, `apis` and `parameters` tables
+  and nothing else — no drops, no renames, no other schema objects.
+- **One engine instance per process.** The table prefix is process-wide
+  state (`models.TablePrefix`); a second engine instance in the same process
+  would silently share it. An engine also mounts at most once — `Mount` is
+  idempotent by design.
+- **`SetTablePrefix` runs once, before the first database use.**
+  `Config.TablePrefix` does this for you (installed before migration, only
+  when non-empty). Hosts that call `models.SetTablePrefix` themselves should
+  leave `Config.TablePrefix` empty — GORM caches parsed table names per
+  `*gorm.DB`, so a later change has no effect on an open database, and
+  existing tables are never renamed.
 
-### Build for Current Platform
+## Table prefix
 
-```bash
-make build
-```
+Knot's table names are generic — `groups`, `apis`, `parameters` — which is
+fine for a dedicated database but a collision risk in a database shared with
+the host's own schema. `Config.TablePrefix` namespaces them:
 
-Output: `bin/knot-server`
+| `TablePrefix` | Physical tables |
+| --- | --- |
+| `""` (default) | `groups`, `apis`, `parameters` |
+| `"knot_"` | `knot_groups`, `knot_apis`, `knot_parameters` |
 
-### Build for All Platforms
+- The default empty prefix is a compatibility guarantee: it produces exactly
+  the standalone product's physical schema, so pointing the engine at an
+  existing Knot database (or the
+  [models](https://github.com/ProjAnvil/knot/blob/main/models/README.md)
+  module's v1.0 layout) just works.
+- The prefix is process-global — set it through `Config` before migration,
+  once (see [Ownership rules](#ownership-rules)).
+- The host's own tables are untouched; the embedded-host smoke test in CI
+  (`backend` job) asserts exactly this coexistence.
 
-```bash
-make build-all
-```
+## Versioning
 
-Output:
-- `dist/knot-server-linux` (Linux AMD64)
-- `dist/knot-server-macos` (macOS AMD64)
-- `dist/knot-server-macos-arm64` (macOS ARM64)
-- `dist/knot-server-windows.exe` (Windows AMD64)
+This module is the [`backend/`](https://github.com/ProjAnvil/knot/tree/main/backend)
+directory of [ProjAnvil/knot](https://github.com/ProjAnvil/knot), versioned
+independently with `backend/v*` git tags (the same scheme as the `models`
+module). The current line is **v0**: the engine API may change between
+releases until host feedback stabilizes it; v1 brings full semver
+guarantees.
 
-## Testing
+## Standalone binaries
 
-```bash
-# Run tests
-make test
-
-# Or
-go test -v ./...
-```
-
-## Development
-
-### Code Formatting
-
-```bash
-make fmt
-```
-
-### Linting
-
-```bash
-make lint
-```
-
-### Clean Build Artifacts
-
-```bash
-make clean
-```
-
-## Performance
-
-### Expected Performance Metrics
-
-| Metric | Go Implementation | TypeScript/Bun |
-|--------|------------------|----------------|
-| Startup Time | ~10ms | ~100ms |
-| Memory Usage | ~15MB | ~50MB |
-| Request Latency | ~1ms | ~5ms |
-| Concurrent Requests | ~10,000 req/s | ~1,000 req/s |
-| Binary Size | ~15MB | ~40MB |
-
-### Benchmarking
-
-```bash
-# Run benchmarks
-go test -bench=. -benchmem ./...
-```
-
-## Migration from TypeScript
-
-The Go backend provides **100% API compatibility** with the TypeScript version. You can switch between them without any frontend changes.
-
-### Key Differences
-
-1. **Performance**: Go version is 5-10x faster
-2. **Memory**: Uses 3x less memory
-3. **Startup**: 10x faster startup time
-4. **Deployment**: Single binary, no runtime needed
-5. **Type Safety**: Compile-time type checking
-
-### Database Migration
-
-The Go backend uses the same database schema as the TypeScript version. You can use the same database file without migration:
-
-```bash
-# Use existing database
-cp ~/.knot/knot.db ~/.knot/knot.db.backup
-./bin/knot-server
-```
-
-## Troubleshooting
-
-### Database Issues
-
-```bash
-# Check database location
-ls -la ~/.knot/
-
-# Check permissions
-chmod 644 ~/.knot/knot.db
-
-# Reset database
-rm ~/.knot/knot.db
-./bin/knot-server
-```
-
-### Port Already in Use
-
-```bash
-# Use different port
-PORT=8080 ./bin/knot-server
-```
-
-### Logging
-
-Enable logging in config:
-
-```json
-{
-  "enableLogging": true
-}
-```
-
-View logs:
-
-```bash
-tail -f ~/.knot/log/knot.log
-```
-
-## Contributing
-
-See the main repository [CONTRIBUTING.md](../CONTRIBUTING.md) for guidelines.
+`cmd/server` (`knot-server`) and `cmd/cli` (`knot`) in this module are
+reference hosts: they open the database from the configuration file, register
+their own health endpoint and static frontend, then `New` + `Mount` the
+engine. Build them with `make build` from this directory, or see the
+[repository README](https://github.com/ProjAnvil/knot) for the full
+development workflow.
 
 ## License
 
-MIT License - see [LICENSE](../LICENSE) for details.
-
-## Related
-
-- [TypeScript Backend](../backend/) - Original implementation
-- [Frontend](../frontend/) - Svelte 5 frontend
-- [MCP Server](../mcp-server/) - Model Context Protocol server
-- [Design Document](./DESIGN.md) - Technical design details
-
-## Roadmap
-
-- [ ] Implement CLI tool (Cobra)
-- [ ] Add Export handler (HTML generation)
-- [ ] Add MCP Tools handler
-- [ ] Static file embedding (embed.FS)
-- [ ] Add unit tests
-- [ ] Add integration tests
-- [ ] Performance benchmarking
-- [ ] Docker support
-- [ ] CI/CD pipeline
-
-## Support
-
-For issues and questions, please open an issue on the [GitHub repository](https://github.com/ProjAnvil/knot/issues).
+MIT — same as the repository
+([LICENSE](https://github.com/ProjAnvil/knot/blob/main/LICENSE)).

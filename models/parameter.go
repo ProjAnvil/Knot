@@ -23,9 +23,10 @@ type Parameter struct {
 	UpdatedAt   int64       `gorm:"autoUpdateTime" json:"-"`
 }
 
-// TableName specifies the table name for Parameter
+// TableName specifies the table name for Parameter: TablePrefix + "parameters".
+// The default empty prefix keeps the v1.0 table name "parameters".
 func (Parameter) TableName() string {
-	return "parameters"
+	return TablePrefix + "parameters"
 }
 
 // MarshalJSON customizes JSON serialization to convert timestamps to ISO 8601 strings
