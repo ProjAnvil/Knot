@@ -3,6 +3,7 @@ package models
 import (
 	"encoding/json"
 	"regexp"
+	"strings"
 	"testing"
 )
 
@@ -57,8 +58,7 @@ func TestGroupDefaultValues(t *testing.T) {
 }
 
 // TestGroupJSONSerialization verifies JSON marshaling
-// Note: The current MarshalJSON implementation does not include Order field
-// This test documents the current behavior
+// Note: The custom MarshalJSON includes the Order field
 func TestGroupJSONSerialization(t *testing.T) {
 	group := Group{
 		ID:        1,
@@ -86,8 +86,10 @@ func TestGroupJSONSerialization(t *testing.T) {
 		t.Errorf("Expected name 'Test Group', got %v", result["name"])
 	}
 
-	// Note: Order field is not included in custom MarshalJSON - this is a known limitation
-	// The default JSON tag on Order field works when not using custom MarshalJSON
+	// Order is emitted by the custom MarshalJSON
+	if order, ok := result["order"].(float64); !ok || order != 5 {
+		t.Errorf("Expected order 5, got %v", result["order"])
+	}
 
 	// Verify createdAt is in ISO 8601 format
 	createdAt, ok := result["createdAt"].(string)
@@ -106,6 +108,35 @@ func TestGroupJSONSerialization(t *testing.T) {
 	}
 	if !iso8601Pattern.MatchString(updatedAt) {
 		t.Errorf("Expected updatedAt in ISO 8601 format, got '%s'", updatedAt)
+	}
+}
+
+// TestGroupJSONSerializationIncludesOrder verifies the custom MarshalJSON
+// emits the Order field and pins the serialized key order:
+// name, then order, then apis.
+func TestGroupJSONSerializationIncludesOrder(t *testing.T) {
+	group := Group{Name: "x", Order: 7}
+
+	data, err := json.Marshal(group)
+	if err != nil {
+		t.Fatalf("Failed to marshal group to JSON: %v", err)
+	}
+
+	raw := string(data)
+	if !strings.Contains(raw, `"order":7`) {
+		t.Errorf("Expected JSON to contain \"order\":7, got %s", raw)
+	}
+
+	// Assert key positions in the raw JSON bytes: name < order < apis
+	nameIdx := strings.Index(raw, `"name"`)
+	orderIdx := strings.Index(raw, `"order"`)
+	apisIdx := strings.Index(raw, `"apis"`)
+	if nameIdx == -1 || orderIdx == -1 || apisIdx == -1 {
+		t.Fatalf("Expected keys name, order, apis all present, got %s", raw)
+	}
+	if !(nameIdx < orderIdx && orderIdx < apisIdx) {
+		t.Errorf("Expected key order name < order < apis, got indices name=%d, order=%d, apis=%d in %s",
+			nameIdx, orderIdx, apisIdx, raw)
 	}
 }
 

@@ -31,6 +31,10 @@ func RegisterRoutes(app *fiber.App, db *gorm.DB, prefix string) {
 
 	// APIs routes
 	apis := api.Group("/apis")
+	// The flat list must be registered before (and independently of) the
+	// "/:id" detail route: Fiber's router prefers the static "/" segment, so
+	// GET /apis lists and GET /apis/5 resolves the detail handler.
+	apis.Get("/", ListAPIs(db))
 	apis.Get("/:id", GetAPI(db))
 	apis.Get("/group/:groupId", GetAPIsByGroup(db))
 	apis.Post("/", CreateAPI(db))

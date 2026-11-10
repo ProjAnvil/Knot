@@ -15,6 +15,7 @@ package knot
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/ProjAnvil/knot/backend/internal/handlers"
@@ -62,9 +63,12 @@ type Config struct {
 
 // Knot is an instance of the embeddable engine. Construct with New.
 type Knot struct {
-	db      *gorm.DB
-	prefix  string
-	mounted bool
+	db     *gorm.DB
+	prefix string
+	// mountedOn tracks the apps this engine has already registered routes on
+	// (*fiber.App -> struct{}), making Mount idempotent per app rather than
+	// per engine instance.
+	mountedOn sync.Map
 }
 
 // New validates the configuration, installs the table prefix (only when
@@ -93,14 +97,20 @@ func New(cfg Config) (*Knot, error) {
 }
 
 // Mount registers the engine's HTTP routes on the app under Config.APIPrefix
-// (default "/api"). Mount is idempotent: a second call is a no-op, so hosts
-// can mount defensively. Static file serving, health checks and host routes
-// are not touched — those stay with the host.
+// (default "/api"). Mount is idempotent per app: mounting the same app a
+// second time is a no-op — so hosts can mount defensively — while mounting
+// the same engine on several distinct apps registers the full route set on
+// each. Static file serving, health checks and host routes are not touched —
+// those stay with the host.
 func (k *Knot) Mount(app *fiber.App) {
-	if k.mounted {
+	// Store the app key first and register only when it was newly stored, so
+	// exactly one goroutine registers routes per app. A concurrent Mount of
+	// the same app may return before the winning goroutine finishes
+	// registering — benign, since route registration completes before the
+	// host serves traffic (Mount runs during host setup).
+	if _, loaded := k.mountedOn.LoadOrStore(app, struct{}{}); loaded {
 		return
 	}
-	k.mounted = true
 	handlers.RegisterRoutes(app, k.db, k.prefix)
 }
 

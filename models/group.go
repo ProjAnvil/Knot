@@ -32,12 +32,14 @@ func (g Group) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
 		ID        uint   `json:"id"`
 		Name      string `json:"name"`
+		Order     int    `json:"order"`
 		APIs      []API  `json:"apis"`
 		CreatedAt string `json:"createdAt"`
 		UpdatedAt string `json:"updatedAt"`
 	}{
 		ID:        g.ID,
 		Name:      g.Name,
+		Order:     g.Order,
 		APIs:      apis,
 		CreatedAt: time.Unix(g.CreatedAt, 0).UTC().Format(time.RFC3339),
 		UpdatedAt: time.Unix(g.UpdatedAt, 0).UTC().Format(time.RFC3339),

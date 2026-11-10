@@ -21,11 +21,15 @@ It is versioned with `models/vX.Y.Z` git tags (e.g. `models/v1.0.0`), and
 ## Versioning
 
 The module follows [semantic versioning](https://semver.org/) via the
-repository's `models/v*` tags — the current release is **v1.1.0**. Breaking
+repository's `models/v*` tags — the current release is **v1.2.0**. Breaking
 changes to any exported type or to the wire format bump the major version
 (per Go module conventions, a v2 would move the import path to
 `github.com/ProjAnvil/knot/models/v2`); backwards-compatible additions are
 minor releases; fixes are patches.
+
+v1.2.0 is an additive wire change: the `Group` domain type's JSON now emits
+`order` (its `MarshalJSON` previously omitted the field). Consumers see one
+new field wherever a `Group` is marshaled; nothing is renamed or removed.
 
 ## Packages
 
@@ -42,7 +46,11 @@ The **root package** defines:
   `ImportResult`);
 - the Knot JSON v1 wire-format types — `KnotExportDocument` with its
   `KnotExportGroup` / `KnotExportAPI` / `KnotExportParams` children, and the
-  envelope constants `WireFormat` (`"knot"`) and `WireVersion` (`1`);
+  envelope constants `WireFormat` (`"knot"`) and `WireVersion` (`1`).
+  `WireFormat` is the value written into a Knot JSON document's envelope
+  `format` field to identify the v1 wire format — it is not the backend
+  export request's `format` parameter (whose values are `""`, `html`,
+  `json`, `openapi` and `postman`);
 - the validation constants `HTTPMethods`, `APITypes`, `ParamTypes`, and
   `ParamValueTypes`, with their `IsValidMethod` / `IsValidAPIType` /
   `IsValidParamType` / `IsValidParamValueType` predicates.

@@ -476,6 +476,173 @@ func TestUpdateAPI(t *testing.T) {
 		assert.Equal(t, "/original", apiData["endpoint"]) // Unchanged
 	})
 
+	t.Run("givenValidGroupID_whenUpdateAPI_thenAPIIsMovedToNewGroup", func(t *testing.T) {
+		// Arrange
+		db := setupTestDB(t)
+		app := setupAPIsTestApp(db)
+
+		group1 := models.Group{Name: "Group One", Order: 1}
+		group2 := models.Group{Name: "Group Two", Order: 2}
+		db.Create(&group1)
+		db.Create(&group2)
+
+		testAPI := models.API{
+			GroupID:  group1.ID,
+			Name:     "Movable API",
+			Endpoint: "/move",
+			Method:   "GET",
+			Type:     "HTTP",
+			Order:    3,
+		}
+		db.Create(&testAPI)
+
+		body := map[string]interface{}{
+			"groupId": group2.ID,
+		}
+		jsonBody, _ := json.Marshal(body)
+
+		// Act
+		req := httptest.NewRequest("PATCH", "/api/apis/1", bytes.NewReader(jsonBody))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+
+		// Assert
+		assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+
+		var respBody response.Response
+		err = json.NewDecoder(resp.Body).Decode(&respBody)
+		require.NoError(t, err)
+
+		assert.True(t, respBody.Success)
+
+		apiData := respBody.Data.(map[string]interface{})
+		assert.Equal(t, float64(group2.ID), apiData["groupId"])
+
+		// Verify move persisted and the API keeps its current order value
+		var updated models.API
+		require.NoError(t, db.First(&updated, testAPI.ID).Error)
+		assert.Equal(t, group2.ID, updated.GroupID)
+		assert.Equal(t, 3, updated.Order)
+	})
+
+	t.Run("givenNonExistentGroupID_whenUpdateAPI_thenReturnsGroupNotFound", func(t *testing.T) {
+		// Arrange
+		db := setupTestDB(t)
+		app := setupAPIsTestApp(db)
+
+		group := models.Group{Name: "Test Group", Order: 1}
+		db.Create(&group)
+
+		testAPI := models.API{
+			GroupID:  group.ID,
+			Name:     "Test API",
+			Endpoint: "/test",
+			Method:   "GET",
+			Type:     "HTTP",
+		}
+		db.Create(&testAPI)
+
+		body := map[string]interface{}{
+			"groupId": 999,
+		}
+		jsonBody, _ := json.Marshal(body)
+
+		// Act
+		req := httptest.NewRequest("PATCH", "/api/apis/1", bytes.NewReader(jsonBody))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+
+		// Assert
+		assert.Equal(t, fiber.StatusNotFound, resp.StatusCode)
+
+		var respBody response.Response
+		err = json.NewDecoder(resp.Body).Decode(&respBody)
+		require.NoError(t, err)
+
+		assert.False(t, respBody.Success)
+		assert.Contains(t, respBody.Error, "Group not found")
+	})
+
+	t.Run("givenZeroGroupID_whenUpdateAPI_thenReturnsBadRequest", func(t *testing.T) {
+		// Arrange
+		db := setupTestDB(t)
+		app := setupAPIsTestApp(db)
+
+		group := models.Group{Name: "Test Group", Order: 1}
+		db.Create(&group)
+
+		testAPI := models.API{
+			GroupID:  group.ID,
+			Name:     "Test API",
+			Endpoint: "/test",
+			Method:   "GET",
+			Type:     "HTTP",
+		}
+		db.Create(&testAPI)
+
+		body := map[string]interface{}{
+			"groupId": 0,
+		}
+		jsonBody, _ := json.Marshal(body)
+
+		// Act
+		req := httptest.NewRequest("PATCH", "/api/apis/1", bytes.NewReader(jsonBody))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+
+		// Assert
+		assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
+
+		var respBody response.Response
+		err = json.NewDecoder(resp.Body).Decode(&respBody)
+		require.NoError(t, err)
+
+		assert.False(t, respBody.Success)
+		assert.Contains(t, respBody.Error, "Invalid group ID")
+	})
+
+	t.Run("givenNoGroupID_whenUpdateAPI_thenGroupIDUnchanged", func(t *testing.T) {
+		// Arrange
+		db := setupTestDB(t)
+		app := setupAPIsTestApp(db)
+
+		group1 := models.Group{Name: "Group One", Order: 1}
+		group2 := models.Group{Name: "Group Two", Order: 2}
+		db.Create(&group1)
+		db.Create(&group2)
+
+		testAPI := models.API{
+			GroupID:  group1.ID,
+			Name:     "Stable API",
+			Endpoint: "/stable",
+			Method:   "GET",
+			Type:     "HTTP",
+		}
+		db.Create(&testAPI)
+
+		newName := "Renamed API"
+		body := map[string]interface{}{
+			"name": &newName,
+		}
+		jsonBody, _ := json.Marshal(body)
+
+		// Act
+		req := httptest.NewRequest("PATCH", "/api/apis/1", bytes.NewReader(jsonBody))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+
+		// Assert
+		assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+
+		var updated models.API
+		require.NoError(t, db.First(&updated, testAPI.ID).Error)
+		assert.Equal(t, group1.ID, updated.GroupID)
+	})
+
 	t.Run("givenNonExistentAPIID_whenUpdateAPI_thenReturnsNotFound", func(t *testing.T) {
 		// Arrange
 		db := setupTestDB(t)

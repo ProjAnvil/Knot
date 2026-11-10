@@ -122,6 +122,7 @@ func UpdateAPI(db *gorm.DB) fiber.Handler {
 			Method   *string `json:"method"`
 			Type     *string `json:"type"`
 			Note     *string `json:"note"`
+			GroupID  *uint   `json:"groupId"`
 		}
 
 		if err := c.BodyParser(&body); err != nil {
@@ -134,6 +135,24 @@ func UpdateAPI(db *gorm.DB) fiber.Handler {
 				return response.NotFound(c, "API not found")
 			}
 			return response.InternalError(c, "Failed to fetch API")
+		}
+
+		// A nil GroupID leaves the API in its current group. A non-nil value
+		// moves the API; 0 is never a valid group ID.
+		if body.GroupID != nil {
+			if *body.GroupID == 0 {
+				return response.BadRequest(c, "Invalid group ID")
+			}
+
+			var group models.Group
+			if err := db.First(&group, *body.GroupID).Error; err != nil {
+				if err == gorm.ErrRecordNotFound {
+					return response.NotFound(c, "Group not found")
+				}
+				return response.InternalError(c, "Failed to fetch group")
+			}
+			// Move the API; it keeps its current order value.
+			api.GroupID = *body.GroupID
 		}
 
 		if body.Name != nil {
