@@ -51,17 +51,17 @@ test:
 
 # Run tests with race detector and coverage, then enforce the 85% gate on
 # the new export/import code: the services files matched by
-# param_node/export_knot/export_openapi/export_postman/import_ plus the
-# handlers/import.go and handlers/export.go files (their names lack the
-# underscore, so they are listed explicitly). Exits non-zero if any
-# function in a gated file is below 85.0%, or if the grep pattern matches
-# nothing at all (e.g. the gated files were renamed) so the gate can never
-# pass vacuously.
+# param_node/export_knot/export_openapi/export_postman/import_/export_build
+# plus the handlers/import.go and handlers/export.go files (their names
+# lack the underscore, so they are listed explicitly) and the embeddable
+# engine facade backend/knot.go. Exits non-zero if any function in a gated
+# file is below 85.0%, or if the grep pattern matches nothing at all
+# (e.g. the gated files were renamed) so the gate can never pass vacuously.
 test-coverage:
 	@go test ./... -race -covermode=atomic -coverprofile=coverage.out
 	@func_report=$$(go tool cover -func=coverage.out); \
 	printf '%s\n' "$$func_report"; \
-	gated=$$(printf '%s\n' "$$func_report" | grep -E '(export_knot|export_openapi|export_postman|import_|handlers/import\.go|handlers/export\.go)'); \
+	gated=$$(printf '%s\n' "$$func_report" | grep -E '(export_knot|export_openapi|export_postman|import_|export_build|handlers/import\.go|handlers/export\.go|backend/knot\.go)'); \
 	if [ -z "$$gated" ]; then \
 		echo "COVERAGE GATE FAIL: no functions matched the gated-file pattern (renamed or missing files?)"; \
 		exit 1; \

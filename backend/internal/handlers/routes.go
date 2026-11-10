@@ -5,10 +5,20 @@ import (
 	"gorm.io/gorm"
 )
 
-// SetupRoutes registers all API routes on the given Fiber app.
-// Both the standalone server and CLI serve command use this to avoid duplication.
+// SetupRoutes registers all API routes on the given Fiber app under the
+// default "/api" prefix. Both the standalone server and CLI serve command
+// use this to avoid duplication.
 func SetupRoutes(app *fiber.App, db *gorm.DB) {
-	api := app.Group("/api")
+	RegisterRoutes(app, db, "/api")
+}
+
+// RegisterRoutes registers all API routes under the given prefix. It is the
+// single routing source shared by SetupRoutes and the embeddable engine
+// facade (knot.Knot.Mount), which mounts the same routes under a
+// host-chosen prefix. It must be exported because the facade lives in the
+// module-root package knot, a different package from this one.
+func RegisterRoutes(app *fiber.App, db *gorm.DB, prefix string) {
+	api := app.Group(prefix)
 
 	// Groups routes
 	groups := api.Group("/groups")
