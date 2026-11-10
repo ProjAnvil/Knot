@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http/httptest"
 	"testing"
 
@@ -311,6 +312,99 @@ func TestCreateGroup(t *testing.T) {
 		db.Where("name = ?", "New Group").First(&newGroup)
 		assert.Equal(t, 2, newGroup.Order)
 	})
+
+	t.Run("givenDuplicateGroupName_whenCreateGroup_thenReturnsConflict", func(t *testing.T) {
+		// Arrange
+		db := setupTestDB(t)
+		app := setupTestApp(db)
+
+		existing := models.Group{Name: "Existing Group", Order: 1}
+		db.Create(&existing)
+
+		body := map[string]string{"name": "Existing Group"}
+		jsonBody, _ := json.Marshal(body)
+
+		// Act
+		req := httptest.NewRequest("POST", "/api/groups", bytes.NewReader(jsonBody))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+
+		// Assert
+		assert.Equal(t, fiber.StatusConflict, resp.StatusCode)
+
+		var respBody response.Response
+		err = json.NewDecoder(resp.Body).Decode(&respBody)
+		require.NoError(t, err)
+
+		assert.False(t, respBody.Success)
+		assert.Contains(t, respBody.Error, "Group name already exists")
+
+		// Verify no duplicate row was created
+		var count int64
+		db.Model(&models.Group{}).Count(&count)
+		assert.Equal(t, int64(1), count)
+	})
+
+	t.Run("givenUniqueViolationFromDatabase_whenCreateGroup_thenReturnsConflict", func(t *testing.T) {
+		// Arrange: simulate a race where the pre-check passes but the insert
+		// still hits the unique constraint.
+		db := setupTestDB(t)
+		app := setupTestApp(db)
+
+		require.NoError(t, db.Callback().Create().Before("gorm:create").Register("test:inject_unique", func(tx *gorm.DB) {
+			tx.AddError(errors.New("UNIQUE constraint failed: groups.name"))
+		}))
+
+		body := map[string]string{"name": "Fresh Group"}
+		jsonBody, _ := json.Marshal(body)
+
+		// Act
+		req := httptest.NewRequest("POST", "/api/groups", bytes.NewReader(jsonBody))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+
+		// Assert
+		assert.Equal(t, fiber.StatusConflict, resp.StatusCode)
+
+		var respBody response.Response
+		err = json.NewDecoder(resp.Body).Decode(&respBody)
+		require.NoError(t, err)
+
+		assert.False(t, respBody.Success)
+		assert.Contains(t, respBody.Error, "Group name already exists")
+	})
+
+	t.Run("givenNonUniqueCreateError_whenCreateGroup_thenReturnsInternalServerError", func(t *testing.T) {
+		// Arrange: only duplicate-key errors may map to 409; any other
+		// create failure must stay a 500.
+		db := setupTestDB(t)
+		app := setupTestApp(db)
+
+		require.NoError(t, db.Callback().Create().Before("gorm:create").Register("test:inject_non_unique", func(tx *gorm.DB) {
+			tx.AddError(errors.New("database is locked"))
+		}))
+
+		body := map[string]string{"name": "Fresh Group"}
+		jsonBody, _ := json.Marshal(body)
+
+		// Act
+		req := httptest.NewRequest("POST", "/api/groups", bytes.NewReader(jsonBody))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+
+		// Assert
+		assert.Equal(t, fiber.StatusInternalServerError, resp.StatusCode)
+
+		var respBody response.Response
+		err = json.NewDecoder(resp.Body).Decode(&respBody)
+		require.NoError(t, err)
+
+		assert.False(t, respBody.Success)
+		assert.Contains(t, respBody.Error, "Failed to create group")
+	})
 }
 
 // TestUpdateGroup tests the UpdateGroup handler
@@ -426,6 +520,138 @@ func TestUpdateGroup(t *testing.T) {
 
 		assert.False(t, respBody.Success)
 		assert.Contains(t, respBody.Error, "Group name is required")
+	})
+
+	t.Run("givenNameTakenByAnotherGroup_whenUpdateGroup_thenReturnsConflict", func(t *testing.T) {
+		// Arrange
+		db := setupTestDB(t)
+		app := setupTestApp(db)
+
+		first := models.Group{Name: "Taken Name", Order: 1}
+		second := models.Group{Name: "Original Name", Order: 2}
+		db.Create(&first)
+		db.Create(&second)
+
+		body := map[string]string{"name": "Taken Name"}
+		jsonBody, _ := json.Marshal(body)
+
+		// Act
+		req := httptest.NewRequest("PATCH", "/api/groups/2", bytes.NewReader(jsonBody))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+
+		// Assert
+		assert.Equal(t, fiber.StatusConflict, resp.StatusCode)
+
+		var respBody response.Response
+		err = json.NewDecoder(resp.Body).Decode(&respBody)
+		require.NoError(t, err)
+
+		assert.False(t, respBody.Success)
+		assert.Contains(t, respBody.Error, "Group name already exists")
+
+		// Verify the original name is untouched
+		var reloaded models.Group
+		require.NoError(t, db.First(&reloaded, second.ID).Error)
+		assert.Equal(t, "Original Name", reloaded.Name)
+	})
+
+	t.Run("givenUnchangedName_whenUpdateGroup_thenUpdateSucceeds", func(t *testing.T) {
+		// Arrange: renaming a group to its own current name must not be
+		// treated as a conflict.
+		db := setupTestDB(t)
+		app := setupTestApp(db)
+
+		group := models.Group{Name: "Same Name", Order: 1}
+		db.Create(&group)
+
+		body := map[string]string{"name": "Same Name"}
+		jsonBody, _ := json.Marshal(body)
+
+		// Act
+		req := httptest.NewRequest("PATCH", "/api/groups/1", bytes.NewReader(jsonBody))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+
+		// Assert
+		assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+
+		var respBody response.Response
+		err = json.NewDecoder(resp.Body).Decode(&respBody)
+		require.NoError(t, err)
+
+		assert.True(t, respBody.Success)
+
+		groupData := respBody.Data.(map[string]interface{})
+		assert.Equal(t, "Same Name", groupData["name"])
+	})
+
+	t.Run("givenUniqueViolationFromDatabase_whenUpdateGroup_thenReturnsConflict", func(t *testing.T) {
+		// Arrange: simulate a race where the pre-check passes but the save
+		// still hits the unique constraint.
+		db := setupTestDB(t)
+		app := setupTestApp(db)
+
+		group := models.Group{Name: "Original Name", Order: 1}
+		db.Create(&group)
+
+		require.NoError(t, db.Callback().Update().Before("gorm:update").Register("test:inject_unique", func(tx *gorm.DB) {
+			tx.AddError(errors.New("UNIQUE constraint failed: groups.name"))
+		}))
+
+		body := map[string]string{"name": "Fresh Name"}
+		jsonBody, _ := json.Marshal(body)
+
+		// Act
+		req := httptest.NewRequest("PATCH", "/api/groups/1", bytes.NewReader(jsonBody))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+
+		// Assert
+		assert.Equal(t, fiber.StatusConflict, resp.StatusCode)
+
+		var respBody response.Response
+		err = json.NewDecoder(resp.Body).Decode(&respBody)
+		require.NoError(t, err)
+
+		assert.False(t, respBody.Success)
+		assert.Contains(t, respBody.Error, "Group name already exists")
+	})
+
+	t.Run("givenNonUniqueUpdateError_whenUpdateGroup_thenReturnsInternalServerError", func(t *testing.T) {
+		// Arrange: only duplicate-key errors may map to 409; any other
+		// save failure must stay a 500.
+		db := setupTestDB(t)
+		app := setupTestApp(db)
+
+		group := models.Group{Name: "Original Name", Order: 1}
+		db.Create(&group)
+
+		require.NoError(t, db.Callback().Update().Before("gorm:update").Register("test:inject_non_unique", func(tx *gorm.DB) {
+			tx.AddError(errors.New("database is locked"))
+		}))
+
+		body := map[string]string{"name": "Fresh Name"}
+		jsonBody, _ := json.Marshal(body)
+
+		// Act
+		req := httptest.NewRequest("PATCH", "/api/groups/1", bytes.NewReader(jsonBody))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+
+		// Assert
+		assert.Equal(t, fiber.StatusInternalServerError, resp.StatusCode)
+
+		var respBody response.Response
+		err = json.NewDecoder(resp.Body).Decode(&respBody)
+		require.NoError(t, err)
+
+		assert.False(t, respBody.Success)
+		assert.Contains(t, respBody.Error, "Failed to update group")
 	})
 }
 

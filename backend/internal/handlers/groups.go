@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"errors"
+	"regexp"
 	"strconv"
 
 	"github.com/ProjAnvil/knot/backend/pkg/response"
@@ -9,6 +11,26 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
+
+// uniqueViolationPattern matches duplicate-key errors across every supported
+// database dialect:
+//   - SQLite:     "UNIQUE constraint failed: groups.name"
+//   - MySQL:      "Duplicate entry 'x' for key 'groups.name'"
+//   - PostgreSQL: "... SQLSTATE 23505 (unique_violation)"
+//
+// The tokens are intentionally broad so a driver wording change cannot break
+// the race backstop; do not prune them.
+var uniqueViolationPattern = regexp.MustCompile(`UNIQUE|Duplicate|23505`)
+
+// isUniqueViolation reports whether err looks like a duplicate-key violation.
+func isUniqueViolation(err error) bool {
+	return err != nil && uniqueViolationPattern.MatchString(err.Error())
+}
+
+// duplicateGroupName sends the shared 409 response for name conflicts.
+func duplicateGroupName(c *fiber.Ctx) error {
+	return response.Conflict(c, "Group name already exists")
+}
 
 // GetGroups returns all groups
 func GetGroups(db *gorm.DB) fiber.Handler {
@@ -73,6 +95,14 @@ func CreateGroup(db *gorm.DB) fiber.Handler {
 			return response.BadRequest(c, "Group name is required")
 		}
 
+		// Pre-check the name so clients get a friendly 409 instead of a 500.
+		var existing models.Group
+		if err := db.Where("name = ?", body.Name).First(&existing).Error; err == nil {
+			return duplicateGroupName(c)
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return response.InternalError(c, "Failed to create group")
+		}
+
 		// Get max order
 		var maxOrder int
 		db.Model(&models.Group{}).Select("COALESCE(MAX(?), 0)", clause.Column{Name: "order"}).Scan(&maxOrder)
@@ -83,6 +113,11 @@ func CreateGroup(db *gorm.DB) fiber.Handler {
 		}
 
 		if err := db.Create(&group).Error; err != nil {
+			// Backstop for the race where a duplicate name slips past the
+			// pre-check and the database rejects the insert.
+			if isUniqueViolation(err) {
+				return duplicateGroupName(c)
+			}
 			return response.InternalError(c, "Failed to create group")
 		}
 
@@ -118,8 +153,26 @@ func UpdateGroup(db *gorm.DB) fiber.Handler {
 			return response.InternalError(c, "Failed to fetch group")
 		}
 
+		// Only check for conflicts when the name actually changes; renaming a
+		// group to its own current name must succeed.
+		if body.Name != group.Name {
+			var existing models.Group
+			if err := db.Where("name = ?", body.Name).First(&existing).Error; err == nil {
+				if existing.ID != group.ID {
+					return duplicateGroupName(c)
+				}
+			} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return response.InternalError(c, "Failed to fetch group")
+			}
+		}
+
 		group.Name = body.Name
 		if err := db.Save(&group).Error; err != nil {
+			// Backstop for the race where a conflicting rename slips past the
+			// pre-check and the database rejects the save.
+			if isUniqueViolation(err) {
+				return duplicateGroupName(c)
+			}
 			return response.InternalError(c, "Failed to update group")
 		}
 
